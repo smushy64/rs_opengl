@@ -5,7 +5,7 @@ param(
 
 $dst = "./target/debug"
 
-if $release {
+if ($release) {
     $dst = "./target/release"
 }
 
