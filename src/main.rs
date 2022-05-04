@@ -138,9 +138,34 @@ fn main() {
 
     let shader = shaders::ShaderProgram::from_shaders( &[vert, frag] ).unwrap();
 
-    unsafe {
-        gl::UseProgram( shader.id() );
-    }
+    let _ortho_projection = opengl_fn::ortho(
+        0.0, 1280.0,
+        0.0, 720.0,
+        0.1, 100.0
+    );
+
+    let _persp_projection = opengl_fn::persp(
+        45.0,
+        1280.0 / 720.0,
+        0.1, 100.0
+    );
+
+    use fmath::functions::angles::degrees_to_radians as d2r;
+    let translate = Vector3::new( 0.0, 0.0, 1.0 );
+    let rotation = Vector3::new( d2r( -80.0 ), 0.0, 0.0 );
+    let scale = Vector3::new_one();
+    let mut model_mat = Matrix4x4::new_trs(
+        translate.as_array(),
+        rotation.as_array(),
+        scale.as_array()
+    );
+
+    let camera_translate = Vector3::new( 0.0, 0.0, -3.0 );
+    let view_mat = Matrix4x4::new_translate( camera_translate.as_array() );
+
+    let model_id = shader.get_uniform_location( "model" );
+    let view_id = shader.get_uniform_location( "view" );
+    let projection_id = shader.get_uniform_location( "projection" );
 
     while running {
         use sdl2::event::Event;
@@ -155,6 +180,23 @@ fn main() {
 
             gl::Clear( gl::COLOR_BUFFER_BIT );
 
+            gl::UniformMatrix4fv(
+                model_id, 1, gl::FALSE,
+                model_mat.as_array().as_ptr()
+            );
+    
+            gl::UniformMatrix4fv(
+                view_id, 1, gl::FALSE,
+                view_mat.as_array().as_ptr()
+            );
+    
+            gl::UniformMatrix4fv(
+                projection_id, 1, gl::FALSE,
+                _persp_projection.as_array().as_ptr()
+            );
+    
+            gl::UseProgram( shader.id() );
+
             gl::BindVertexArray( vao );
             gl::BindBuffer( gl::ARRAY_BUFFER, ebo );
             gl::DrawElements(
@@ -167,6 +209,8 @@ fn main() {
         }
 
         window.gl_swap_window();
+
+        model_mat = model_mat * Matrix4x4::new_rotate( &[0.001, 0.003, 0.002] );
 
     }
 

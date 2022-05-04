@@ -14,11 +14,15 @@ out struct {
 
 } v2f;
 
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
 void main()
 {
     v2f.position = vec4( Position, 1.0 );
     v2f.color = vec3( Color );
     v2f.uv = UV;
     v2f.normal = normalize( Normal );
-    gl_Position = v2f.position;
+    gl_Position = projection * view * model * v2f.position;
 }
