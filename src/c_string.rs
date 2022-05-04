@@ -2,9 +2,9 @@ pub use std::ffi::{ CStr, CString };
 
 pub fn create_empty_c_string( len:usize ) -> CString {
     let mut buffer:Vec<u8> = Vec::with_capacity( len + 1 );
-    for byte in buffer.iter_mut() {
-        *byte = b' ';
-    }
+    buffer.extend(
+        [b' '].iter().cycle().take( len as usize )
+    );
     unsafe { CString::from_vec_unchecked( buffer ) }
 }
 
