@@ -10,8 +10,6 @@ pub fn get_resources_path() -> PathBuf {
     unsafe { PathBuf::from( RESOURCES_PATH.clone() ) }
 }
 
-const LOCAL_SEPARATOR:char = '/';
-
 pub fn load_cstring( local_path:&str ) -> Result<CString, Error> {
     load_cstring_path( resource_path_from_local_path(local_path) )
 }
@@ -53,6 +51,7 @@ pub fn load_bytes_path( path:PathBuf ) -> Result<Vec<u8>, Error> {
     }
 }
 
+const LOCAL_SEPARATOR:char = '/';
 pub fn resource_path_from_local_path( local_path:&str ) -> PathBuf {
     let mut full_path = get_resources_path();
 
