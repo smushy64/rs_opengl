@@ -10,8 +10,13 @@ pub mod opengl_fn;
 
 use gl::types::*;
 use fmath::types::*;
+use rand::Rng;
+
+use rand::thread_rng;
 
 fn main() {
+
+    let mut rng = thread_rng();
 
     resources::initialize();
 
@@ -51,12 +56,59 @@ fn main() {
     let mut running:bool = true;
 
     let vertices:Vec<f32> = vec![
-        /* Positions */ -0.5, -0.5, 0.0, /* Color */ 1.0, 0.0, 0.0, /* Normals */  -1.0, 0.0, 0.0, /* UVs */  0.0, 0.0,
-        /* Positions */  0.5, -0.5, 0.0, /* Color */ 0.0, 1.0, 0.0, /* Normals */   1.0, 0.0, 0.0, /* UVs */  0.0, 0.0,
-        /* Positions */  0.0,  0.5, 0.0, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, 1.0, 0.0, /* UVs */  0.0, 0.0,
+        /* Positions */ -0.5,  0.5,  0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  1.0,
+        /* Positions */  0.5,  0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  1.0,
+        /* Positions */ -0.5, -0.5,  0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  0.0,
+        /* Positions */  0.5, -0.5,  0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  0.0,
+
+        /* Positions */ -0.5,  0.5, -0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */   0.0, 0.0, -1.0, /* UVs */  0.0,  1.0,
+        /* Positions */  0.5,  0.5, -0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */   0.0, 0.0, -1.0, /* UVs */  1.0,  1.0,
+        /* Positions */ -0.5, -0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, 0.0, -1.0, /* UVs */  0.0,  0.0,
+        /* Positions */  0.5, -0.5, -0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */   0.0, 0.0, -1.0, /* UVs */  1.0,  0.0,
+
+        /* Positions */ -0.5,  0.5, -0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  1.0,
+        /* Positions */ -0.5,  0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  1.0,
+        /* Positions */ -0.5, -0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  0.0,
+        /* Positions */ -0.5, -0.5,  0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  0.0,
+
+        /* Positions */  0.5,  0.5, -0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  1.0,
+        /* Positions */  0.5,  0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  1.0,
+        /* Positions */  0.5, -0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  0.0,
+        /* Positions */  0.5, -0.5,  0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  0.0,
+
+        /* Positions */ -0.5,  0.5,  0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  1.0,
+        /* Positions */  0.5,  0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  1.0,
+        /* Positions */ -0.5,  0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  0.0,
+        /* Positions */  0.5,  0.5, -0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  0.0,
+
+        /* Positions */ -0.5, -0.5,  0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  1.0,
+        /* Positions */  0.5, -0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  1.0,
+        /* Positions */ -0.5, -0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  0.0,
+        /* Positions */  0.5, -0.5, -0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  0.0,
     ];
 
-    let indeces:Vec<u32> = vec![ 0, 1, 2 ];
+    let indeces:Vec<u32> = vec![
+        0, 1, 2,
+        1, 3, 2,
+
+        4, 5, 6,
+        5, 7, 6,
+
+        8,  9, 10,
+        9, 11, 10,
+
+        12, 13, 14,
+        13, 15, 14,
+
+        16, 17, 18,
+        17, 19, 18,
+
+        20, 21, 22,
+        21, 23, 22,
+    ];
+
+    // load texture
+    let texture = resources::load_image("textures/container.jpg").unwrap();
 
     let mut vbo:GLuint = 0;
     let mut vao:GLuint = 0;
@@ -127,6 +179,8 @@ fn main() {
 
         gl::BindVertexArray( 0 );
         gl::BindBuffer( gl::ARRAY_BUFFER, 0 );
+
+        gl::Enable( gl::DEPTH_TEST );
     }
 
     // load shader
@@ -138,22 +192,25 @@ fn main() {
 
     let shader = shaders::ShaderProgram::from_shaders( &[vert, frag] ).unwrap();
 
+    let aspect_ratio:f32 = 1280.0 / 720.0;
+
     let _ortho_projection = opengl_fn::ortho(
-        0.0, 1280.0,
-        0.0, 720.0,
-        0.1, 100.0
+        -1.6, 1.6,
+        -0.9, 0.9,
+        0.1, 1000.0
     );
 
     let _persp_projection = opengl_fn::persp(
         45.0,
-        1280.0 / 720.0,
+        aspect_ratio,
         0.1, 100.0
     );
 
     use fmath::functions::angles::degrees_to_radians as d2r;
-    let translate = Vector3::new( 0.0, 0.0, 1.0 );
-    let rotation = Vector3::new( d2r( -80.0 ), 0.0, 0.0 );
-    let scale = Vector3::new_one();
+    let translate = Vector3::new( 0.0, 0.0, 0.0 );
+    let rotation = Vector3::new( d2r( 0.0 ), 0.0, 0.0 );
+    let scale = Vector3::new_one() * 1.0;
+    #[allow(unused_mut)]
     let mut model_mat = Matrix4x4::new_trs(
         translate.as_array(),
         rotation.as_array(),
@@ -163,9 +220,66 @@ fn main() {
     let camera_translate = Vector3::new( 0.0, 0.0, -3.0 );
     let view_mat = Matrix4x4::new_translate( camera_translate.as_array() );
 
+    // model's transform
     let model_id = shader.get_uniform_location( "model" );
+    // camera's transform
     let view_id = shader.get_uniform_location( "view" );
+    // projection matrix
     let projection_id = shader.get_uniform_location( "projection" );
+
+    // load texture into shader
+    unsafe {
+        let mut tex_id:GLuint = 0;
+        gl::GenTextures( 1, &mut tex_id );
+        gl::BindTexture(gl::TEXTURE_2D, tex_id);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as GLint);
+
+        let data = texture.to_rgb8().into_raw();
+
+        gl::TexImage2D(
+            gl::TEXTURE_2D, 0, gl::RGB as GLint,
+            texture.width() as GLint, texture.height() as GLint,
+            0, gl::RGB, gl::UNSIGNED_BYTE,
+            data.as_ptr() as *const GLvoid
+        );
+
+        drop( texture );
+    }
+
+    let mut models:Vec<Matrix4x4> = {
+
+        let mut result = Vec::new();
+
+        let count = 10;
+        let mut counter = 0;
+        while counter < count {
+
+            let t = [
+                rng.gen_range(-5.0f32..5.0f32),
+                rng.gen_range(-5.0f32..5.0f32),
+                rng.gen_range(-10.0f32..-2.0f32)
+            ];
+
+            let r = [
+                rng.gen_range(-1.0f32..1.0f32),
+                rng.gen_range(-1.0f32..1.0f32),
+                rng.gen_range(-1.0f32..1.0f32),
+            ];
+
+            let s = [ 1.0, 1.0, 1.0 ];
+
+            result.push( Matrix4x4::new_trs( &t, &r, &s, ) );
+
+            counter += 1;
+        }
+
+        result
+
+    };
 
     while running {
         use sdl2::event::Event;
@@ -178,12 +292,8 @@ fn main() {
 
         unsafe {
 
-            gl::Clear( gl::COLOR_BUFFER_BIT );
-
-            gl::UniformMatrix4fv(
-                model_id, 1, gl::FALSE,
-                model_mat.as_array().as_ptr()
-            );
+            gl::Clear( gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT );
+            gl::UseProgram( shader.id() );
     
             gl::UniformMatrix4fv(
                 view_id, 1, gl::FALSE,
@@ -194,27 +304,54 @@ fn main() {
                 projection_id, 1, gl::FALSE,
                 _persp_projection.as_array().as_ptr()
             );
-    
-            gl::UseProgram( shader.id() );
 
             gl::BindVertexArray( vao );
             gl::BindBuffer( gl::ARRAY_BUFFER, ebo );
-            gl::DrawElements(
-                gl::TRIANGLES,
-                indeces.len() as GLint,
-                gl::UNSIGNED_INT,
-                core::ptr::null_mut() as *const GLvoid
-            );
+
+            render_cube( &model_mat, model_id, indeces.len() );
+
+            for model in models.iter() {
+                render_cube( model, model_id, indeces.len() );
+            }
 
         }
 
         window.gl_swap_window();
 
+        // model_mat = model_mat * Matrix4x4::new_translate( &[0.0, 0.0, 0.002] );
         model_mat = model_mat * Matrix4x4::new_rotate( &[0.001, 0.003, 0.002] );
+
+        for model in models.iter_mut() {
+
+            *model = *model * Matrix4x4::new_translate( &[ 0.0, -0.002, 0.0 ] );
+
+        }
 
     }
 
     drop( sdl );
     drop( gl_ctx );
+
+}
+
+pub fn render_cube(
+    model_matrix:&Matrix4x4,
+    model_id:GLint,
+    index_count:usize
+) {
+
+    unsafe {
+        gl::UniformMatrix4fv(
+            model_id, 1, gl::FALSE,
+            model_matrix.as_array().as_ptr()
+        );
+
+        gl::DrawElements(
+            gl::TRIANGLES,
+            index_count as GLint,
+            gl::UNSIGNED_INT,
+            core::ptr::null_mut() as *const GLvoid
+        );
+    }
 
 }

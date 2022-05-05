@@ -5,9 +5,21 @@ use std::{
     ffi::{ CString, CStr }
 };
 
+mod image_loader;
+pub use image_loader::DynamicImage;
+
 static mut RESOURCES_PATH:String = String::new();
 pub fn get_resources_path() -> PathBuf {
     unsafe { PathBuf::from( RESOURCES_PATH.clone() ) }
+}
+
+pub fn load_image( local_path:&str ) -> Result<DynamicImage, Error> {
+    load_image_path( resource_path_from_local_path(local_path) )
+}
+
+pub fn load_image_path( path:PathBuf ) -> Result<DynamicImage, Error> {
+    image_loader::load_image(path)
+        .map_err( |e| Error::LoadImage(e) )
 }
 
 pub fn load_cstring( local_path:&str ) -> Result<CString, Error> {
@@ -84,4 +96,5 @@ pub enum Error {
     ReadFile(String),
     UTF8Conversion(String),
     CStringContainsNull(String),
+    LoadImage(String),
 }
