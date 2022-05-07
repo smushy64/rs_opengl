@@ -7,22 +7,32 @@ pub mod resources;
 pub mod shaders;
 pub mod c_string;
 pub mod opengl_fn;
+pub mod input;
+use input::Input;
+pub mod transform;
+use transform::Transform;
 
 use gl::types::*;
 use fmath::types::*;
-use rand::Rng;
-
-use rand::thread_rng;
+use fmath::functions::angles::degrees_to_radians as d2r;
 
 fn main() {
-
-    let mut rng = thread_rng();
 
     resources::initialize();
 
     let sdl = sdl2::init().unwrap();
 
-    let window = {
+    let icon = resources::load_image("program/images/cube.png").unwrap();
+    let mut icon_data = icon.to_rgba8().into_raw();
+
+    let icon_surface = sdl2::surface::Surface::from_data(
+        &mut icon_data,
+        icon.width(), icon.height(),
+        icon.width() * core::mem::size_of::<u32>() as u32,
+        sdl2::pixels::PixelFormatEnum::RGBA32
+    ).unwrap();
+
+    let mut window = {
         let video = sdl.video().unwrap();
         let gl_attr = video.gl_attr();
         gl_attr.set_context_profile( sdl2::video::GLProfile::Core );
@@ -30,8 +40,16 @@ fn main() {
         video.window("OpenGL", 1280, 720)
             .opengl()
             .position_centered()
+            .input_grabbed()
             .build().unwrap()
     };
+
+    window.set_icon( &icon_surface );
+    sdl.mouse().set_relative_mouse_mode(true);
+
+    drop( icon_surface );
+    drop( icon_data );
+    drop( icon );
 
     let gl_ctx = window.gl_create_context().unwrap();
     gl::load_with(
@@ -53,38 +71,42 @@ fn main() {
         gl::Viewport(0 as GLint, 0 as GLint, 1280, 720);
     }
 
-    let mut running:bool = true;
-
     let vertices:Vec<f32> = vec![
-        /* Positions */ -0.5,  0.5,  0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  1.0,
-        /* Positions */  0.5,  0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  1.0,
-        /* Positions */ -0.5, -0.5,  0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  0.0,
-        /* Positions */  0.5, -0.5,  0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  0.0,
+        // front
+        /* Positions */ -0.5,  0.5,  0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */  0.0, 0.0,  1.0, /* UVs */  0.0,  1.0,
+        /* Positions */  0.5,  0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */  0.0, 0.0,  1.0, /* UVs */  1.0,  1.0,
+        /* Positions */ -0.5, -0.5,  0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */  0.0, 0.0,  1.0, /* UVs */  0.0,  0.0,
+        /* Positions */  0.5, -0.5,  0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */  0.0, 0.0,  1.0, /* UVs */  1.0,  0.0,
 
-        /* Positions */ -0.5,  0.5, -0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */   0.0, 0.0, -1.0, /* UVs */  0.0,  1.0,
-        /* Positions */  0.5,  0.5, -0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */   0.0, 0.0, -1.0, /* UVs */  1.0,  1.0,
-        /* Positions */ -0.5, -0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, 0.0, -1.0, /* UVs */  0.0,  0.0,
-        /* Positions */  0.5, -0.5, -0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */   0.0, 0.0, -1.0, /* UVs */  1.0,  0.0,
+        // back
+        /* Positions */ -0.5,  0.5, -0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */  0.0, 0.0, -1.0, /* UVs */  0.0,  1.0,
+        /* Positions */  0.5,  0.5, -0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */  0.0, 0.0, -1.0, /* UVs */  1.0,  1.0,
+        /* Positions */ -0.5, -0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */  0.0, 0.0, -1.0, /* UVs */  0.0,  0.0,
+        /* Positions */  0.5, -0.5, -0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */  0.0, 0.0, -1.0, /* UVs */  1.0,  0.0,
 
-        /* Positions */ -0.5,  0.5, -0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  1.0,
-        /* Positions */ -0.5,  0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  1.0,
-        /* Positions */ -0.5, -0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  0.0,
-        /* Positions */ -0.5, -0.5,  0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  0.0,
+        // left
+        /* Positions */ -0.5,  0.5, -0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */ -1.0, 0.0,  0.0, /* UVs */  0.0,  1.0,
+        /* Positions */ -0.5,  0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */ -1.0, 0.0,  0.0, /* UVs */  1.0,  1.0,
+        /* Positions */ -0.5, -0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */ -1.0, 0.0,  0.0, /* UVs */  0.0,  0.0,
+        /* Positions */ -0.5, -0.5,  0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */ -1.0, 0.0,  0.0, /* UVs */  1.0,  0.0,
 
-        /* Positions */  0.5,  0.5, -0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  1.0,
-        /* Positions */  0.5,  0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  1.0,
-        /* Positions */  0.5, -0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  0.0,
-        /* Positions */  0.5, -0.5,  0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  0.0,
+        // right
+        /* Positions */  0.5,  0.5, -0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */  1.0, 0.0,  0.0, /* UVs */  0.0,  1.0,
+        /* Positions */  0.5,  0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */  1.0, 0.0,  0.0, /* UVs */  1.0,  1.0,
+        /* Positions */  0.5, -0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */  1.0, 0.0,  0.0, /* UVs */  0.0,  0.0,
+        /* Positions */  0.5, -0.5,  0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */  1.0, 0.0,  0.0, /* UVs */  1.0,  0.0,
 
-        /* Positions */ -0.5,  0.5,  0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  1.0,
-        /* Positions */  0.5,  0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  1.0,
-        /* Positions */ -0.5,  0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  0.0,
-        /* Positions */  0.5,  0.5, -0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  0.0,
+        // top
+        /* Positions */ -0.5,  0.5,  0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */  0.0, 1.0,  0.0, /* UVs */  0.0,  1.0,
+        /* Positions */  0.5,  0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */  0.0, 1.0,  0.0, /* UVs */  1.0,  1.0,
+        /* Positions */ -0.5,  0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */  0.0, 1.0,  0.0, /* UVs */  0.0,  0.0,
+        /* Positions */  0.5,  0.5, -0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */  0.0, 1.0,  0.0, /* UVs */  1.0,  0.0,
 
-        /* Positions */ -0.5, -0.5,  0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  1.0,
-        /* Positions */  0.5, -0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  1.0,
-        /* Positions */ -0.5, -0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  0.0,  0.0,
-        /* Positions */  0.5, -0.5, -0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */   0.0, 0.0,  1.0, /* UVs */  1.0,  0.0,
+        // bottom
+        /* Positions */ -0.5, -0.5,  0.5, /* Color */ 1.0, 0.0, 0.0, /* Normals */   0.0, -1.0, 0.0, /* UVs */  0.0,  1.0,
+        /* Positions */  0.5, -0.5,  0.5, /* Color */ 0.0, 1.0, 0.0, /* Normals */   0.0, -1.0, 0.0, /* UVs */  1.0,  1.0,
+        /* Positions */ -0.5, -0.5, -0.5, /* Color */ 0.0, 0.0, 1.0, /* Normals */   0.0, -1.0, 0.0, /* UVs */  0.0,  0.0,
+        /* Positions */  0.5, -0.5, -0.5, /* Color */ 1.0, 0.0, 1.0, /* Normals */   0.0, -1.0, 0.0, /* UVs */  1.0,  0.0,
     ];
 
     let indeces:Vec<u32> = vec![
@@ -183,42 +205,23 @@ fn main() {
         gl::Enable( gl::DEPTH_TEST );
     }
 
-    // load shader
-    let vert_src = resources::load_cstring("shaders/triangle.vert").unwrap();
-    let frag_src = resources::load_cstring("shaders/triangle.frag").unwrap();
-
-    let vert = shaders::Shader::vert_from_source( &vert_src ).unwrap();
-    let frag = shaders::Shader::frag_from_source( &frag_src ).unwrap();
-
-    let shader = shaders::ShaderProgram::from_shaders( &[vert, frag] ).unwrap();
+    let shader = resources::load_shader_program( "shaders/triangle" ).unwrap();
 
     let aspect_ratio:f32 = 1280.0 / 720.0;
 
     let _ortho_projection = opengl_fn::ortho(
         -1.6, 1.6,
         -0.9, 0.9,
-        0.1, 1000.0
+        0.1, 100.0
     );
 
     let _persp_projection = opengl_fn::persp(
-        45.0,
+        d2r(90.0),
         aspect_ratio,
         0.1, 100.0
     );
 
-    use fmath::functions::angles::degrees_to_radians as d2r;
-    let translate = Vector3::new( 0.0, 0.0, 0.0 );
-    let rotation = Vector3::new( d2r( 0.0 ), 0.0, 0.0 );
-    let scale = Vector3::new_one() * 1.0;
-    #[allow(unused_mut)]
-    let mut model_mat = Matrix4x4::new_trs(
-        translate.as_array(),
-        rotation.as_array(),
-        scale.as_array()
-    );
-
-    let camera_translate = Vector3::new( 0.0, 0.0, -3.0 );
-    let view_mat = Matrix4x4::new_translate( camera_translate.as_array() );
+    let cube_transform = Transform::new();
 
     // model's transform
     let model_id = shader.get_uniform_location( "model" );
@@ -250,45 +253,108 @@ fn main() {
         drop( texture );
     }
 
-    let mut models:Vec<Matrix4x4> = {
+    let mut input = Input::new();
 
-        let mut result = Vec::new();
+    let speed:f32 = 1.2;
 
-        let count = 10;
-        let mut counter = 0;
-        while counter < count {
+    let mut last_elapsed:f32 = 0.0;
+    let mut mouse = Vector2::new_zero();
 
-            let t = [
-                rng.gen_range(-5.0f32..5.0f32),
-                rng.gen_range(-5.0f32..5.0f32),
-                rng.gen_range(-10.0f32..-2.0f32)
-            ];
+    let mut camera_position = Vector3::new( 0.0, 0.0, 3.0 );
+    let mut camera_front = Vector3::new_back();
+    let camera_up = Vector3::new_up();
 
-            let r = [
-                rng.gen_range(-1.0f32..1.0f32),
-                rng.gen_range(-1.0f32..1.0f32),
-                rng.gen_range(-1.0f32..1.0f32),
-            ];
+    let mut yaw   = -90.0;
+    let mut pitch = 0.0;
 
-            let s = [ 1.0, 1.0, 1.0 ];
-
-            result.push( Matrix4x4::new_trs( &t, &r, &s, ) );
-
-            counter += 1;
-        }
-
-        result
-
-    };
-
+    let mut running:bool = true;
     while running {
+
         use sdl2::event::Event;
+
+        let elapsed = (_timer.ticks() as f32) / 1000.0;
+        let delta_time = elapsed - last_elapsed;
+
+        let last_mouse = mouse;
+
         for event in event_pump.poll_iter() {
             match event { 
                 Event::Quit { .. } => { running = false; }
+                Event::KeyDown { keycode: key, .. } => {
+                    process_input(&mut input, key, true);
+                },
+                Event::KeyUp { keycode: key, .. } => {
+                    process_input(&mut input, key, false);
+                },
+                Event::MouseMotion { xrel, yrel, .. } => {
+                    mouse[0] += xrel as f32;
+                    mouse[1] += yrel as f32;
+                    input.set_mouse( mouse );
+                }
                 _ => {}
             }
         }
+
+        if last_elapsed == 0.0 {
+            mouse = Vector2::new_zero();
+            input.set_mouse(mouse);
+        }
+
+        last_elapsed = elapsed;
+        
+        input.set_mouse_delta( mouse - last_mouse );
+
+        {
+            let camera_right = Vector3::cross( &camera_front, &camera_up ).normal();
+            yaw   += input.mouse_delta().x() * delta_time *   10.0;
+            pitch += -(input.mouse_delta().y() * delta_time * 10.0);
+            pitch = pitch.clamp(-80.0, 80.0);
+
+            camera_front = Vector3::new(
+                d2r(yaw).cos() * d2r(pitch).cos(),
+                d2r(pitch).sin(),
+                d2r(yaw).sin() * d2r(pitch).cos()
+            ).normal();
+
+            if input.front != input.back {
+                if input.front {
+                    camera_position = camera_position + ( camera_front * speed * delta_time );
+                } else if input.back {
+                    camera_position = camera_position - ( camera_front * speed * delta_time );
+                }
+            }
+
+            if input.right != input.left {
+                if input.right {
+                    camera_position = camera_position + ( camera_right * speed * delta_time );
+                } else if input.left {
+                    camera_position = camera_position - ( camera_right * speed * delta_time );
+                }   
+            }
+
+            if input.up != input.down {
+                if input.up {
+                    camera_position = camera_position + ( camera_up * speed * delta_time );
+                } else if input.down {
+                    camera_position = camera_position - ( camera_up * speed * delta_time );
+                }
+            }
+
+        }
+
+        let look_at = opengl_fn::new_look_at_mat(
+            &camera_position,
+            &( camera_position + camera_front ),
+            &camera_up
+        );
+
+        let proj_mat = {
+            if input.is_ortho_enabled() {
+                &_ortho_projection
+            } else {
+                &_persp_projection
+            }
+        };
 
         unsafe {
 
@@ -297,40 +363,37 @@ fn main() {
     
             gl::UniformMatrix4fv(
                 view_id, 1, gl::FALSE,
-                view_mat.as_array().as_ptr()
+                look_at.as_array().as_ptr()
             );
     
             gl::UniformMatrix4fv(
                 projection_id, 1, gl::FALSE,
-                _persp_projection.as_array().as_ptr()
+                proj_mat.as_array().as_ptr()
             );
-
+            
+            gl::UniformMatrix4fv(
+                model_id, 1, gl::FALSE,
+                cube_transform.mat_ptr()
+            );
+            
             gl::BindVertexArray( vao );
             gl::BindBuffer( gl::ARRAY_BUFFER, ebo );
 
-            render_cube( &model_mat, model_id, indeces.len() );
-
-            for model in models.iter() {
-                render_cube( model, model_id, indeces.len() );
-            }
+            gl::DrawElements(
+                gl::TRIANGLES,
+                indeces.len() as GLint,
+                gl::UNSIGNED_INT,
+                core::ptr::null_mut() as *const GLvoid
+            );
 
         }
 
         window.gl_swap_window();
 
-        // model_mat = model_mat * Matrix4x4::new_translate( &[0.0, 0.0, 0.002] );
-        model_mat = model_mat * Matrix4x4::new_rotate( &[0.001, 0.003, 0.002] );
-
-        for model in models.iter_mut() {
-
-            *model = *model * Matrix4x4::new_translate( &[ 0.0, -0.002, 0.0 ] );
-
-        }
-
     }
 
-    drop( sdl );
     drop( gl_ctx );
+    drop( sdl );
 
 }
 
@@ -354,4 +417,63 @@ pub fn render_cube(
         );
     }
 
+}
+
+use sdl2::keyboard::Keycode;
+fn process_input( input:&mut Input, key_code:Option<Keycode>, is_down:bool ) {
+    match key_code {
+        Some(key) => {
+            match key {
+                Keycode::W => {
+                    if is_down {
+                        input.front = true;
+                    } else {
+                        input.front = false;
+                    }
+                },
+                Keycode::A => {
+                    if is_down {
+                        input.left = true;
+                    } else {
+                        input.left = false;
+                    }
+                },
+                Keycode::S => {
+                    if is_down {
+                        input.back = true;
+                    } else {
+                        input.back = false;
+                    }
+                },
+                Keycode::D => {
+                    if is_down {
+                        input.right = true;
+                    } else {
+                        input.right = false;
+                    }
+                },
+                Keycode::O => {
+                    if is_down {
+                        input.toggle_ortho();
+                    }
+                },
+                Keycode::Space => {
+                    if is_down {
+                        input.up = true;
+                    } else {
+                        input.up = false;
+                    }
+                },
+                Keycode::LShift => {
+                    if is_down {
+                        input.down = true;
+                    } else {
+                        input.down = false;
+                    }
+                },
+                _ => {}
+            }
+        },
+        None => {},
+    }
 }

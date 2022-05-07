@@ -45,6 +45,27 @@ pub fn gl_error_linking( id:GLuint ) -> String {
     }
 }
 
+pub fn new_look_at_mat( position:&Vector3, target:&Vector3, up:&Vector3 ) -> Matrix4x4 {
+
+    let mut zaxis = ( *target - *position ).normal();
+    let xaxis = Vector3::cross(&zaxis, &up).normal();
+    let yaxis = Vector3::cross(&xaxis, &zaxis);
+
+    zaxis = -zaxis;
+
+    Matrix4x4::from_array([
+        xaxis[0], yaxis[0], zaxis[0], 0.0,
+        xaxis[1], yaxis[1], zaxis[1], 0.0,
+        xaxis[2], yaxis[2], zaxis[2], 0.0,
+
+        // row 3
+        -Vector3::dot(&xaxis, position),
+        -Vector3::dot(&yaxis, position),
+        -Vector3::dot(&zaxis, position),
+        1.0
+    ])
+}
+
 pub fn ortho(
     left:f32, right:f32,
     bottom: f32, top:f32,

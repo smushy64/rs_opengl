@@ -8,6 +8,12 @@ use std::{
 mod image_loader;
 pub use image_loader::DynamicImage;
 
+mod shader_loader;
+pub use shader_loader::{
+    load_shader_program,
+    load_shader_program_path
+};
+
 static mut RESOURCES_PATH:String = String::new();
 pub fn get_resources_path() -> PathBuf {
     unsafe { PathBuf::from( RESOURCES_PATH.clone() ) }
@@ -97,4 +103,5 @@ pub enum Error {
     UTF8Conversion(String),
     CStringContainsNull(String),
     LoadImage(String),
+    ShaderError(String),
 }
