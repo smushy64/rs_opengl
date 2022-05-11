@@ -1,3 +1,5 @@
+#vertex -------------------------------------------------------------
+
 #version 330 core
 
 layout ( location = 0 ) in vec3 Position;
@@ -25,4 +27,26 @@ void main()
     v2f.uv = UV;
     v2f.normal = normalize( Normal );
     gl_Position = projection * view * model * v2f.position;
+}
+
+#fragment -----------------------------------------------------------
+
+#version 330 core
+
+in struct {
+
+    vec4 position;
+    vec3 color;
+    vec3 normal;
+    vec2 uv;
+
+} v2f;
+
+uniform vec3 lightColor;
+
+out vec4 FRAG_COLOR;
+
+void main()
+{
+    FRAG_COLOR = vec4( lightColor, 1.0 );
 }

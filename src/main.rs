@@ -4,10 +4,11 @@ extern crate gl;
 extern crate wavefront_obj_importer;
 
 pub mod resources;
-pub mod shaders;
+pub mod shader;
 pub mod c_string;
 pub mod opengl_fn;
 pub mod input;
+
 use input::Input;
 pub mod transform;
 use transform::Transform;
@@ -22,7 +23,7 @@ fn main() {
 
     let sdl = sdl2::init().unwrap();
 
-    let icon = resources::load_image("program/images/cube.png").unwrap();
+    let icon = resources::load_image("program/images/icon.png").unwrap();
     let mut icon_data = icon.to_rgba8().into_raw();
 
     let icon_surface = sdl2::surface::Surface::from_data(
@@ -60,7 +61,7 @@ fn main() {
     let mut event_pump = sdl.event_pump().unwrap();
     let _timer = sdl.timer().unwrap();
 
-    let clear_color = color::RGB::from_hex("#e88bc9").unwrap();
+    let clear_color = color::RGB::from_hex("#776094").unwrap();
     unsafe {
         gl::ClearColor(
             clear_color.r_f32(),
@@ -129,14 +130,11 @@ fn main() {
         21, 23, 22,
     ];
 
-    // load texture
-    let texture = resources::load_image("textures/container.jpg").unwrap();
-
     let mut vbo:GLuint = 0;
     let mut vao:GLuint = 0;
     let mut ebo:GLuint = 0;
 
-    // load triangle into gl
+    // load cube into gl
     unsafe {
         use core::mem::size_of;
 
@@ -205,8 +203,11 @@ fn main() {
         gl::Enable( gl::DEPTH_TEST );
     }
 
-    let shader = resources::load_shader_program( "shaders/triangle" ).unwrap();
+    let light_shader = resources::load_shader_program("shaders/light").unwrap();
+    let cube_shader = resources::load_shader_program( "shaders/cube" ).unwrap();
 
+    cube_shader.use_program();
+    
     let aspect_ratio:f32 = 1280.0 / 720.0;
 
     let _ortho_projection = opengl_fn::ortho(
@@ -216,41 +217,100 @@ fn main() {
     );
 
     let _persp_projection = opengl_fn::persp(
-        d2r(90.0),
+        d2r(80.0),
         aspect_ratio,
-        0.1, 100.0
+        0.01, 100.0
     );
 
-    let cube_transform = Transform::new();
+    let mut cube_transform_0 = Transform::new();
+    cube_transform_0.set_rotation(
+        Vector3::new(
+            d2r(  0.0 ),
+            d2r( 25.0 ),
+            d2r(  0.0 ),
+        )
+    );
+
+    let mut cube_transform_1 = Transform::new();
+    cube_transform_1.set_position( Vector3::new_down() );
+    cube_transform_1.set_scale( Vector3::new( 100.0, 1.0, 100.0 ) );
+
+    let mut light_transform = Transform::new();
+
+    light_transform.set_position( Vector3::new(1.0, 1.2, 1.0) );
+    light_transform.set_scale( Vector3::new_one() * 0.2 );
 
     // model's transform
-    let model_id = shader.get_uniform_location( "model" );
+    let cube_model_id = cube_shader.get_uniform_location( "model" );
     // camera's transform
-    let view_id = shader.get_uniform_location( "view" );
+    let cube_view_id = cube_shader.get_uniform_location( "view" );
     // projection matrix
-    let projection_id = shader.get_uniform_location( "projection" );
+    let cube_projection_id = cube_shader.get_uniform_location( "projection" );
+
+    // model's transform
+    let light_model_id = light_shader.get_uniform_location( "model" );
+    // camera's transform
+    let light_view_id = light_shader.get_uniform_location( "view" );
+    // projection matrix
+    let light_projection_id = light_shader.get_uniform_location( "projection" );
 
     // load texture into shader
     unsafe {
-        let mut tex_id:GLuint = 0;
-        gl::GenTextures( 1, &mut tex_id );
-        gl::BindTexture(gl::TEXTURE_2D, tex_id);
+        
+        // load texture
+        let container = resources::load_image("textures/container.jpg")
+            .unwrap();
+        let awesome_face = resources::load_image("textures/awesomeface.png")
+            .unwrap();
+
+        // load container into opengl
+        let mut tex_0:GLuint = 0;
+        gl::GenTextures( 1, &mut tex_0 );
+        gl::BindTexture(gl::TEXTURE_2D, tex_0);
 
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as GLint);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as GLint);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as GLint);
 
-        let data = texture.to_rgb8().into_raw();
+        let container_data = container.to_rgb8().into_raw();
 
         gl::TexImage2D(
             gl::TEXTURE_2D, 0, gl::RGB as GLint,
-            texture.width() as GLint, texture.height() as GLint,
+            container.width() as GLint, container.height() as GLint,
             0, gl::RGB, gl::UNSIGNED_BYTE,
-            data.as_ptr() as *const GLvoid
+            container_data.as_ptr() as *const GLvoid
         );
+        gl::GenerateMipmap( gl::TEXTURE_2D );
 
-        drop( texture );
+        // load awesome face into opengl
+        let mut tex_1:GLuint = 0;
+        gl::GenTextures( 1, &mut tex_1 );
+        gl::BindTexture( gl::TEXTURE_2D, tex_1 );
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as GLint);
+
+        let awesome_face_data = awesome_face.flipv().to_rgba8().into_raw();
+
+        gl::TexImage2D(
+            gl::TEXTURE_2D, 0, gl::RGB as GLint,
+            awesome_face.width() as GLint, awesome_face.height() as GLint,
+            0, gl::RGBA, gl::UNSIGNED_BYTE,
+            awesome_face_data.as_ptr() as *const GLvoid
+        );
+        gl::GenerateMipmap( gl::TEXTURE_2D );
+
+        gl::ActiveTexture(gl::TEXTURE0);
+        gl::BindTexture(gl::TEXTURE_2D, tex_0);
+        gl::ActiveTexture(gl::TEXTURE1);
+        gl::BindTexture(gl::TEXTURE_2D, tex_1);
+
+        gl::Uniform1i( cube_shader.get_uniform_location("tex0") , 0);
+        gl::Uniform1i( cube_shader.get_uniform_location("tex1") , 1);
+
     }
 
     let mut input = Input::new();
@@ -267,6 +327,41 @@ fn main() {
     let mut yaw   = -90.0;
     let mut pitch = 0.0;
 
+    let cube_view_position_location =
+        cube_shader.get_uniform_location("view_position");
+
+    let light_color = color::RGB::from_hex( "#FFFFFF" ).unwrap();
+    unsafe {
+        cube_shader.use_program();
+        let cube_light_color_location = cube_shader.get_uniform_location("lightColor");
+        gl::Uniform3f(
+            cube_light_color_location,
+            light_color.r_f32(),
+            light_color.g_f32(),
+            light_color.b_f32()
+        );
+
+        let cube_light_position_location =
+            cube_shader.get_uniform_location("world_space_light_position");
+        gl::Uniform3f(
+            cube_light_position_location,
+            *light_transform.position().x(),
+            *light_transform.position().y(),
+            *light_transform.position().z()
+        );
+
+        light_shader.use_program();
+        let light_light_color_location = light_shader.get_uniform_location("lightColor");
+        gl::Uniform3f(
+            light_light_color_location,
+            light_color.r_f32(),
+            light_color.g_f32(),
+            light_color.b_f32()
+        );
+    }
+
+    let mut _cube_rot_y = 0.0;
+
     let mut running:bool = true;
     while running {
 
@@ -276,6 +371,10 @@ fn main() {
         let delta_time = elapsed - last_elapsed;
 
         let last_mouse = mouse;
+
+        // rotate cube
+        // cube_transform_0.set_rotation(Vector3::new( 0.0, _cube_rot_y, 0.0 ));
+        // _cube_rot_y += delta_time;
 
         for event in event_pump.poll_iter() {
             match event { 
@@ -293,6 +392,10 @@ fn main() {
                 }
                 _ => {}
             }
+        }
+
+        if input.is_quitting() {
+            running = false;
         }
 
         if last_elapsed == 0.0 {
@@ -359,25 +462,75 @@ fn main() {
         unsafe {
 
             gl::Clear( gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT );
-            gl::UseProgram( shader.id() );
     
+            cube_shader.use_program();
+
             gl::UniformMatrix4fv(
-                view_id, 1, gl::FALSE,
+                cube_view_id, 1, gl::FALSE,
                 look_at.as_array().as_ptr()
             );
     
             gl::UniformMatrix4fv(
-                projection_id, 1, gl::FALSE,
+                cube_projection_id, 1, gl::FALSE,
                 proj_mat.as_array().as_ptr()
             );
             
             gl::UniformMatrix4fv(
-                model_id, 1, gl::FALSE,
-                cube_transform.mat_ptr()
+                cube_model_id, 1, gl::FALSE,
+                cube_transform_0.mat_ptr()
+            );
+
+            gl::Uniform3f(
+                cube_view_position_location,
+                *camera_position.x(),
+                *camera_position.y(),
+                *camera_position.z()
             );
             
             gl::BindVertexArray( vao );
             gl::BindBuffer( gl::ARRAY_BUFFER, ebo );
+
+            // draw main cube ===========================================
+
+            gl::DrawElements(
+                gl::TRIANGLES,
+                indeces.len() as GLint,
+                gl::UNSIGNED_INT,
+                core::ptr::null_mut() as *const GLvoid
+            );
+
+            // draw platform ============================================
+
+            gl::UniformMatrix4fv(
+                cube_model_id, 1, gl::FALSE,
+                cube_transform_1.mat_ptr()
+            );
+
+            gl::DrawElements(
+                gl::TRIANGLES,
+                indeces.len() as GLint,
+                gl::UNSIGNED_INT,
+                core::ptr::null_mut() as *const GLvoid
+            );
+
+            // draw light ===============================================
+
+            light_shader.use_program();
+
+            gl::UniformMatrix4fv(
+                light_view_id, 1, gl::FALSE,
+                look_at.as_array().as_ptr()
+            );
+    
+            gl::UniformMatrix4fv(
+                light_projection_id, 1, gl::FALSE,
+                proj_mat.as_array().as_ptr()
+            );
+
+            gl::UniformMatrix4fv(
+                light_model_id, 1, gl::FALSE,
+                light_transform.mat_ptr()
+            );
 
             gl::DrawElements(
                 gl::TRIANGLES,
@@ -469,6 +622,11 @@ fn process_input( input:&mut Input, key_code:Option<Keycode>, is_down:bool ) {
                         input.down = true;
                     } else {
                         input.down = false;
+                    }
+                },
+                Keycode::Escape => {
+                    if is_down {
+                        input.quit_game();
                     }
                 },
                 _ => {}

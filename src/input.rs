@@ -9,6 +9,8 @@ pub struct Input {
     mouse_pos:Vector2,
     mouse_delta:Vector2,
     ortho_enabled:bool,
+
+    quit:bool,
 }
 
 impl Input {
@@ -21,6 +23,8 @@ impl Input {
             mouse_pos:Vector2::new_zero(),
             mouse_delta:Vector2::new_zero(),
             ortho_enabled:false,
+
+            quit:false,
         }
     }
 
@@ -46,5 +50,13 @@ impl Input {
 
     pub fn is_ortho_enabled( &self ) -> bool {
         self.ortho_enabled
+    }
+
+    pub fn quit_game( &mut self ) {
+        self.quit = true;
+    }
+
+    pub fn is_quitting( &self ) -> bool {
+        self.quit
     }
 }
