@@ -61,9 +61,8 @@ in struct {
 
 struct Material {
 
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
+    sampler2D diffuse;
+    sampler2D specular;
     float shininess;
 
 };
@@ -88,19 +87,22 @@ out vec4 FRAG_COLOR;
 void main()
 {
 
-    vec3 ambient = light.ambient * material.ambient;
+    vec3 diffuse_texture = vec3( texture( material.diffuse, v2f.uv ) );
+    vec3 specular_texture = vec3( texture( material.specular, v2f.uv ) );
+
+    vec3 ambient = light.ambient * diffuse_texture;
 
     // normalized here because of interpolation
     vec3 normal = normalize( v2f.world_space_normal );
 
     vec3 lightDirection = normalize( light.position - v2f.world_space_position.xyz );
     float diff = max( dot( lightDirection, normal ), 0.0 );
-    vec3 diffuse = light.diffuse * ( diff * material.diffuse );
+    vec3 diffuse = light.diffuse * ( diff * diffuse_texture );
 
     vec3 viewDirection = normalize( view_position - v2f.world_space_position.xyz );
     vec3 reflectDirection = reflect( -lightDirection, normal );
     float spec = pow( max( dot( viewDirection, reflectDirection ), 0.0 ), material.shininess );
-    vec3 specular = light.specular * ( spec * material.specular );
+    vec3 specular = light.specular * ( spec * specular_texture );
 
     vec3 result = ambient + diffuse + specular;
     FRAG_COLOR = vec4( result, 1.0 );

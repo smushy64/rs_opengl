@@ -19,6 +19,13 @@ impl ShaderProgram {
         }
     }
 
+    pub fn set_int( &self, name:&str, value:i32 ) {
+        let location = self.get_uniform_location(name);
+        unsafe {
+            gl::Uniform1i( location, value );
+        }
+    }
+
     pub fn set_float( &self, name:&str, value:f32 ) {
         let location = self.get_uniform_location(name);
         unsafe {

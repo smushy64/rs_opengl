@@ -62,8 +62,8 @@ fn main() {
     let mut event_pump = sdl.event_pump().unwrap();
     let _timer = sdl.timer().unwrap();
 
-    let clear_color = color::RGB::from_hex("#776094").unwrap();
-    // let clear_color = color::RGB::from_hex("#000000").unwrap();
+    // let clear_color = color::RGB::from_hex("#776094").unwrap();
+    let clear_color = color::RGB::from_hex("#000000").unwrap();
     opengl_fn::set_clear_color( &clear_color );
     unsafe {
         gl::Viewport(0 as GLint, 0 as GLint, 1280, 720);
@@ -87,9 +87,9 @@ fn main() {
     let mut cube_transform_0 = Transform::new();
     cube_transform_0.set_rotation(
         Vector3::new(
-            d2r(  0.0 ),
-            d2r( 25.0 ),
-            d2r(  0.0 ),
+            d2r( -30.0 ),
+            d2r(  25.0 ),
+            d2r(   0.0 ),
         )
     );
 
@@ -115,13 +115,11 @@ fn main() {
 
     let mut yaw   = -90.0;
     let mut pitch = 0.0;
-
     
     cube_shader.use_program();
     
     let light_color = color::HSV::new( 0.0, 0.0, 1.0 );
     let light_rgb = light_color.as_rgb();
-    // let mut hue = 0.0;
 
     cube_shader.set_vec3("light.ambient", &(Vector3::new_one() * 0.2) );
     // light color
@@ -129,22 +127,68 @@ fn main() {
     cube_shader.set_vec3("light.specular", &Vector3::new( 1.0, 1.0, 1.0 ) );
     cube_shader.set_vec3("light.position", light_transform.position());
 
-    cube_shader.set_color("material.ambient", &light_rgb);
-    cube_shader.set_vec3("material.diffuse", &Vector3::new( 1.0, 1.0, 1.0 ));
-    cube_shader.set_vec3("material.specular", &Vector3::new( 0.5, 0.5, 0.5 ) );
-    cube_shader.set_float("material.shininess", 32.0);
+    // loading diffuse and specular textures
+    unsafe {
 
-    let mut light_color_bulb = light_color.clone();
-    light_color_bulb.set_saturation(0.1);
+        let diffuse_texture =
+            resources::load_image("textures/container2.png").unwrap();
+
+        let specular_texture = 
+            resources::load_image( "textures/container2_specular.png" ).unwrap();
+        // let specular_texture = 
+        //     resources::load_image( "textures/container2_specular_colored.png" ).unwrap();
+
+        let mut diffuse_id = 0;
+        gl::GenTextures( 1, &mut diffuse_id );
+        gl::BindTexture( gl::TEXTURE_2D, diffuse_id );
+
+        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as GLint );
+        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as GLint );
+        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint );
+        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as GLint );
+
+        gl::TexImage2D(
+            gl::TEXTURE_2D, 0, gl::RGB as GLint,
+            diffuse_texture.width() as GLint, diffuse_texture.height() as GLint,
+            0, gl::RGB, gl::UNSIGNED_BYTE,
+            diffuse_texture.to_rgb8().as_raw().as_ptr() as *const GLvoid
+        );
+        gl::GenerateMipmap( gl::TEXTURE_2D );
+
+        let mut specular_id = 0;
+        gl::GenTextures( 1, &mut specular_id );
+        gl::BindTexture( gl::TEXTURE_2D, specular_id );
+
+        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as GLint );
+        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as GLint );
+        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint );
+        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as GLint );
+
+        gl::TexImage2D(
+            gl::TEXTURE_2D, 0, gl::RGB as GLint,
+            specular_texture.width() as GLint, specular_texture.height() as GLint,
+            0, gl::RGB, gl::UNSIGNED_BYTE,
+            specular_texture.to_rgb8().as_raw().as_ptr() as *const GLvoid
+        );
+        gl::GenerateMipmap( gl::TEXTURE_2D );
+
+        gl::ActiveTexture( gl::TEXTURE0 );
+        gl::BindTexture( gl::TEXTURE_2D, diffuse_id );
+        gl::ActiveTexture( gl::TEXTURE1 );
+        gl::BindTexture( gl::TEXTURE_2D, specular_id );
+
+    }
+
+    cube_shader.set_int( "material.diffuse", 0 );  // use texcoord0
+    cube_shader.set_int( "material.specular", 1 ); // use texcoord1
+    cube_shader.set_float("material.shininess", 16.0);
 
     light_shader.use_program();
-    light_shader.set_color("lightColor", &light_color_bulb.as_rgb());
-
-
-    let mut running:bool = true;
+    light_shader.set_color("lightColor", &color::RGB::from_hex( "#FFFFFF" ).unwrap());
 
     unsafe { gl::Enable( gl::DEPTH_TEST ); }
 
+    let mut running:bool = true;
     while running {
 
         use sdl2::event::Event;
@@ -153,12 +197,6 @@ fn main() {
         let delta_time = elapsed - last_elapsed;
 
         let last_mouse = mouse;
-
-        // light_color.set_hue( hue );
-        // hue += delta_time * 10.0;
-
-        // light_color_bulb = light_color.clone();
-        // light_color_bulb.set_saturation(0.1);
 
         for event in event_pump.poll_iter() {
             match event { 
@@ -244,24 +282,12 @@ fn main() {
             cube_shader.set_mat4("projection", &perspective_projection);
             cube_shader.set_mat4("model", cube_transform_0.mat());
             cube_shader.set_vec3("view_position", &camera_position);
-
-            // light_rgb = light_color.as_rgb();
-
-            // cube_shader.set_color("light.diffuse", &light_rgb );
-            // cube_shader.set_color("material.ambient", &light_rgb);
             
             cube_mesh.render();
-
-            // draw platform ============================================
-
-            // cube_shader.set_mat4("model", cube_transform_1.mat());
-            // cube_mesh.render();
 
             // draw light ===============================================
 
             light_shader.use_program();
-
-            // light_shader.set_color("lightColor", &light_color_bulb.as_rgb());
 
             light_shader.set_mat4("view", &view_mat);
             light_shader.set_mat4("projection", &perspective_projection);
