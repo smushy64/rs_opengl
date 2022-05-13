@@ -3,6 +3,17 @@ use fmath::types::*;
 
 use super::c_string;
 
+pub fn set_clear_color( color:&color::RGB ) {
+    unsafe {
+        gl::ClearColor(
+        color.r_f32(),
+        color.g_f32(),
+        color.b_f32(),
+        1.0
+        );
+    }
+}
+
 pub fn gl_error_compilation( id:GLuint ) -> String {
     let mut len:GLint = 0;
     unsafe {

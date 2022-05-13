@@ -69,6 +69,10 @@ impl Transform {
         self.mat.as_array().as_ptr()
     }
 
+    pub fn mat( &self ) -> &Matrix4x4 {
+        &self.mat
+    }
+
 }
 
 use core::fmt::Display;

@@ -8,7 +8,6 @@ pub struct Input {
 
     mouse_pos:Vector2,
     mouse_delta:Vector2,
-    ortho_enabled:bool,
 
     quit:bool,
 }
@@ -22,14 +21,9 @@ impl Input {
 
             mouse_pos:Vector2::new_zero(),
             mouse_delta:Vector2::new_zero(),
-            ortho_enabled:false,
 
             quit:false,
         }
-    }
-
-    pub fn toggle_ortho( &mut self ) {
-        self.ortho_enabled = !self.ortho_enabled;
     }
 
     pub fn set_mouse( &mut self, pos:Vector2 ) {
@@ -46,10 +40,6 @@ impl Input {
 
     pub fn mouse_delta( &self ) -> &Vector2 {
         &self.mouse_delta
-    }
-
-    pub fn is_ortho_enabled( &self ) -> bool {
-        self.ortho_enabled
     }
 
     pub fn quit_game( &mut self ) {

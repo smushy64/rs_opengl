@@ -1,4 +1,5 @@
 use gl::types::*;
+use fmath::types::*;
 use super::c_string;
 use super::opengl_fn;
 
@@ -9,60 +10,43 @@ pub struct ShaderProgram {
 
 impl ShaderProgram {
 
-    pub fn get_uniforms( &self ) -> Vec<( c_string::CString, GLenum, GLint )> {
-        unsafe {
-            // count of uniforms
-            let mut count:GLint = 0;
-            gl::GetProgramiv(
-                self.id(),
-                gl::ACTIVE_UNIFORMS,
-                &mut count
-            );
-
-            let mut uniforms:Vec<( c_string::CString, GLenum, GLint )> = Vec::new();
-
-            let mut i:GLint = 0;
-            while i < count {
-
-                let mut variable_size = 0;
-                let mut uniform_type:GLenum = 0;
-                let name_buffer_len:GLint = 255;
-                
-                let mut name = c_string::create_empty_c_string(
-                    (name_buffer_len + 1) as usize
-                );
-
-                gl::GetActiveUniform(
-                    self.id(), i as GLuint,
-                    name_buffer_len, core::ptr::null_mut(),
-                    &mut variable_size, &mut uniform_type,
-                    name.as_ptr() as *mut GLchar
-                );
-
-                name = c_string::format_c_string_uniform_name(name).unwrap();
-
-                let id = gl::GetUniformLocation(
-                    self.id(),
-                    name.as_ptr() as *const GLchar
-                );
-
-                uniforms.push( (name, uniform_type, id) );
-
-                i += 1;
-            }
-
-            return uniforms;
-
-        }
-
-    }
-
     pub fn get_uniform_location( &self, name:&str ) -> GLint {
         unsafe {
             let c_name = c_string::c_string_from_str(name).unwrap();
             let location =
                 gl::GetUniformLocation( self.id() , c_name.as_ptr() as *const GLchar );
             return location;
+        }
+    }
+
+    pub fn set_float( &self, name:&str, value:f32 ) {
+        let location = self.get_uniform_location(name);
+        unsafe {
+            gl::Uniform1f( location, value );
+        }
+    }
+
+    pub fn set_mat4( &self, name:&str, value:&Matrix4x4 ) {
+        let location = self.get_uniform_location(name);
+        unsafe {
+            gl::UniformMatrix4fv(
+                location, 1, 
+                gl::FALSE, value.as_array().as_ptr()
+            );
+        }
+    }
+
+    pub fn set_vec3( &self, name:&str, value:&Vector3 ) {
+        let location = self.get_uniform_location(name);
+        unsafe {
+            gl::Uniform3fv( location, 1, value.as_array().as_ptr() );
+        }
+    }
+
+    pub fn set_color( &self, name:&str, value:&color::RGB ) {
+        let location = self.get_uniform_location(name);
+        unsafe {
+            gl::Uniform3fv( location, 1, value.as_float_rgb_array().as_ptr() );
         }
     }
 

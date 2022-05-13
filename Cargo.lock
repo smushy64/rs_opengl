@@ -189,9 +189,7 @@ dependencies = [
 
 [[package]]
 name = "fmath"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56c45c38b88e5af97a92977447081c2e3b0e6e84703c770df5c10cb23a873ea4"
+version = "0.2.5"
 
 [[package]]
 name = "futures-core"
