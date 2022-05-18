@@ -1,3 +1,5 @@
+## Point Light Demo
+
 Download and unzip, run `opengl.exe`.
 
 The program will not run without the resources folder present in the same directory.
@@ -10,3 +12,5 @@ The program will not run without the resources folder present in the same direct
 | L Shift        | Increase Camera Speed |
 | Mouse          | Look                  |
 | ESC            | Quit Application      |
+
+![image](../../../progress/point_light.jpg)

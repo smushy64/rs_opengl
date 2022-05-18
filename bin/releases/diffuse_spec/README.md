@@ -1,3 +1,5 @@
+## Diffuse and Specular Demo
+
 Download and unzip, run `opengl.exe`.
 
 The program will not run without the resources folder present in the same directory.
@@ -9,3 +11,5 @@ The program will not run without the resources folder present in the same direct
 | Space & Shift | Vertical Movement |
 | Mouse         | Look              |
 | ESC           | Quit Application  |
+
+![image](../../../progress/diffuse_specular.jpg)
