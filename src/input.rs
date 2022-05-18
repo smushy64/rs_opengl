@@ -6,6 +6,8 @@ pub struct Input {
     pub left: bool, pub right:bool,
     pub up:   bool, pub down: bool,
 
+    pub speed_up:bool,
+
     mouse_pos:Vector2,
     mouse_delta:Vector2,
 
@@ -18,6 +20,8 @@ impl Input {
             front:false, back: false,
             left: false, right:false,
             up:   false, down: false,
+
+            speed_up: false,
 
             mouse_pos:Vector2::new_zero(),
             mouse_delta:Vector2::new_zero(),

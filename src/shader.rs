@@ -19,42 +19,67 @@ impl ShaderProgram {
         }
     }
 
-    pub fn set_int( &self, name:&str, value:i32 ) {
-        let location = self.get_uniform_location(name);
+    pub fn set_i32( &self, loc:GLint, value:&i32 ) {
         unsafe {
-            gl::Uniform1i( location, value );
+            gl::Uniform1i( loc, *value );
         }
     }
 
-    pub fn set_float( &self, name:&str, value:f32 ) {
-        let location = self.get_uniform_location(name);
+    pub fn set_i32_by_name( &self, name:&str, value:&i32 ) {
+        self.set_i32( self.get_uniform_location( name ), value )
+    }
+
+    pub fn set_f32( &self, loc:GLint, value:&f32 ) {
         unsafe {
-            gl::Uniform1f( location, value );
+            gl::Uniform1f( loc, *value );
         }
     }
 
-    pub fn set_mat4( &self, name:&str, value:&Matrix4x4 ) {
-        let location = self.get_uniform_location(name);
+    pub fn set_f32_by_name( &self, name:&str, value:&f32 ) {
+        self.set_f32( self.get_uniform_location(name), value );
+    }
+
+    pub fn set_matrix4( &self, loc:GLint, value:&Matrix4x4 ) {
         unsafe {
             gl::UniformMatrix4fv(
-                location, 1, 
+                loc, 1, 
                 gl::FALSE, value.as_array().as_ptr()
             );
         }
     }
 
-    pub fn set_vec3( &self, name:&str, value:&Vector3 ) {
-        let location = self.get_uniform_location(name);
+    pub fn set_matrix4_by_name( &self, name:&str, value:&Matrix4x4 ) {
+        self.set_matrix4( self.get_uniform_location(name), value );
+    }
+
+    pub fn set_vector3( &self, loc:GLint, value:&Vector3 ) {
         unsafe {
-            gl::Uniform3fv( location, 1, value.as_array().as_ptr() );
+            gl::Uniform3fv( loc, 1, value.as_array().as_ptr() );
         }
     }
 
-    pub fn set_color( &self, name:&str, value:&color::RGB ) {
-        let location = self.get_uniform_location(name);
+    pub fn set_vector3_by_name( &self, name:&str, value:&Vector3 ) {
+        self.set_vector3( self.get_uniform_location(name), value );
+    }
+
+    pub fn set_vector4( &self, loc:GLint, value:&Vector4 ) {
         unsafe {
-            gl::Uniform3fv( location, 1, value.as_float_rgb_array().as_ptr() );
+            gl::Uniform4fv( loc, 1, value.as_array().as_ptr() );
         }
+    }
+
+    pub fn set_vector4_by_name( &self, name:&str, value:&Vector4 ) {
+        self.set_vector4( self.get_uniform_location(name), value );
+    }
+
+    pub fn set_rgb( &self, loc:GLint, value:&color::RGB ) {
+        unsafe {
+            gl::Uniform3fv( loc, 1, value.as_float_rgb_array().as_ptr() );
+        }
+    }
+
+    pub fn set_rgb_by_name( &self, name:&str, value:&color::RGB ) {
+        self.set_rgb( self.get_uniform_location(name), value );
     }
 
     pub fn use_program(&self) {
@@ -164,7 +189,7 @@ impl Drop for Shader {
 
 }
 
-pub enum ShaderKind {
+enum ShaderKind {
     Vertex, Fragment
 }
 

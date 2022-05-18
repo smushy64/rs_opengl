@@ -2,6 +2,9 @@ extern crate sdl2;
 extern crate fmath;
 extern crate gl;
 extern crate wavefront_obj_importer;
+extern crate rand;
+
+use rand::{thread_rng, Rng};
 
 pub mod resources;
 pub mod shader;
@@ -84,27 +87,46 @@ fn main() {
         0.01, 100.0
     );
 
-    let mut cube_transform_0 = Transform::new();
-    cube_transform_0.set_rotation(
-        Vector3::new(
-            d2r( -30.0 ),
-            d2r(  25.0 ),
-            d2r(   0.0 ),
-        )
-    );
+    let mut rng = thread_rng();
 
-    let mut cube_transform_1 = Transform::new();
-    cube_transform_1.set_position( Vector3::new_down() );
-    cube_transform_1.set_scale( Vector3::new( 100.0, 1.0, 100.0 ) );
+    let cube_count = 10;
+    let mut cube_transforms:Vec<Transform> = Vec::with_capacity( cube_count );
+    let mut counter = 0;
+
+    let xy_range = 5.0;
+    let z_range  = 20.0;
+    let rot_range = 180.0;
+
+    while counter < cube_count {
+        cube_transforms.push( Transform::new() );
+
+        cube_transforms[counter].set_position(
+            Vector3::new(
+                rng.gen_range( -xy_range..xy_range ),
+                rng.gen_range( -xy_range..xy_range ),
+                rng.gen_range( -z_range..0.0 )
+            )
+        );
+        cube_transforms[counter].set_rotation(
+            Vector3::new(
+                rng.gen_range( -rot_range..rot_range ),
+                rng.gen_range( -rot_range..rot_range ),
+                rng.gen_range( -rot_range..rot_range ),
+            )
+        );
+        counter += 1;
+    }
 
     let mut light_transform = Transform::new();
+    let light_position_y = 1.2;
 
-    light_transform.set_position( Vector3::new(1.0, 1.2, 1.0) );
+    light_transform.set_position( Vector3::new(1.0, light_position_y, 1.0) );
     light_transform.set_scale( Vector3::new_one() * 0.2 );
 
     let mut input = Input::new();
-
-    let speed:f32 = 1.2;
+    // NOTE: Camera Speed
+    let slow_camera_speed:f32 = 1.5;
+    let fast_camera_speed:f32 = 3.0;
 
     let mut last_elapsed:f32 = 0.0;
     let mut mouse = Vector2::new_zero();
@@ -121,11 +143,11 @@ fn main() {
     let light_color = color::HSV::new( 0.0, 0.0, 1.0 );
     let light_rgb = light_color.as_rgb();
 
-    cube_shader.set_vec3("light.ambient", &(Vector3::new_one() * 0.2) );
+    cube_shader.set_vector3_by_name("light.ambient", &(Vector3::new_one() * 0.2) );
     // light color
-    cube_shader.set_color("light.diffuse", &light_rgb );
-    cube_shader.set_vec3("light.specular", &Vector3::new( 1.0, 1.0, 1.0 ) );
-    cube_shader.set_vec3("light.position", light_transform.position());
+    cube_shader.set_rgb_by_name("light.diffuse", &light_rgb );
+    cube_shader.set_vector3_by_name("light.specular", &Vector3::new( 1.0, 1.0, 1.0 ) );
+    let cube_shader_light_position_location = cube_shader.get_uniform_location("light.position");
 
     // loading diffuse and specular textures
     unsafe {
@@ -179,12 +201,17 @@ fn main() {
 
     }
 
-    cube_shader.set_int( "material.diffuse", 0 );  // use texcoord0
-    cube_shader.set_int( "material.specular", 1 ); // use texcoord1
-    cube_shader.set_float("material.shininess", 16.0);
+    cube_shader.set_i32_by_name( "material.diffuse", &0 );  // use texcoord0
+    cube_shader.set_i32_by_name( "material.specular", &1 ); // use texcoord1
+    cube_shader.set_f32_by_name( "material.shininess", &16.0);
+
+    cube_shader.set_f32_by_name( "light.constant",  &1.0   );
+    cube_shader.set_f32_by_name( "light.linear",    &0.09  );
+    cube_shader.set_f32_by_name( "light.quadratic", &0.032 );
 
     light_shader.use_program();
-    light_shader.set_color("lightColor", &color::RGB::from_hex( "#FFFFFF" ).unwrap());
+    let mut light_color = color::HSV::new( 0.0, 0.0, 1.0 );
+    light_shader.set_rgb_by_name("lightColor", &light_color.as_rgb() );
 
     unsafe { gl::Enable( gl::DEPTH_TEST ); }
 
@@ -241,27 +268,33 @@ fn main() {
                 d2r(yaw).sin() * d2r(pitch).cos()
             ).normal();
 
+            let camera_speed = if input.speed_up {
+                fast_camera_speed
+            } else {
+                slow_camera_speed
+            };
+
             if input.front != input.back {
                 if input.front {
-                    camera_position = camera_position + ( camera_front * speed * delta_time );
+                    camera_position = camera_position + ( camera_front * camera_speed * delta_time );
                 } else if input.back {
-                    camera_position = camera_position - ( camera_front * speed * delta_time );
+                    camera_position = camera_position - ( camera_front * camera_speed * delta_time );
                 }
             }
 
             if input.right != input.left {
                 if input.right {
-                    camera_position = camera_position + ( camera_right * speed * delta_time );
+                    camera_position = camera_position + ( camera_right * camera_speed * delta_time );
                 } else if input.left {
-                    camera_position = camera_position - ( camera_right * speed * delta_time );
+                    camera_position = camera_position - ( camera_right * camera_speed * delta_time );
                 }   
             }
 
             if input.up != input.down {
                 if input.up {
-                    camera_position = camera_position + ( camera_up * speed * delta_time );
+                    camera_position = camera_position + ( camera_up * camera_speed * delta_time );
                 } else if input.down {
-                    camera_position = camera_position - ( camera_up * speed * delta_time );
+                    camera_position = camera_position - ( camera_up * camera_speed * delta_time );
                 }
             }
 
@@ -273,29 +306,51 @@ fn main() {
             &camera_up
         );
 
+        let mut new_light_position = light_transform.position().clone();
+        new_light_position[1] = light_position_y + ( elapsed.sin() * 2.0 );
+        light_transform.set_position( new_light_position );
+
         unsafe {
-
             gl::Clear( gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT );
+        }
     
-            cube_shader.use_program();
-            cube_shader.set_mat4("view", &view_mat);
-            cube_shader.set_mat4("projection", &perspective_projection);
-            cube_shader.set_mat4("model", cube_transform_0.mat());
-            cube_shader.set_vec3("view_position", &camera_position);
-            
-            cube_mesh.render();
+        cube_shader.use_program();
 
-            // draw light ===============================================
+        let light_strength = elapsed.cos() + 2.0;
+        light_color = color::HSV::new( 0.0, 0.0, light_strength / 3.0 );
 
-            light_shader.use_program();
+        cube_shader.set_f32_by_name( "light.strength",  &light_strength );
 
-            light_shader.set_mat4("view", &view_mat);
-            light_shader.set_mat4("projection", &perspective_projection);
-            light_shader.set_mat4("model", light_transform.mat());
+        cube_shader.set_matrix4_by_name("view", &view_mat);
+        cube_shader.set_matrix4_by_name("projection", &perspective_projection);
+        cube_shader.set_vector3_by_name("view_position", &camera_position);
 
-            cube_mesh.render();
+        cube_shader.set_vector4(
+            cube_shader_light_position_location,
+            &light_transform.position().as_vector4()
+        );
+        
+        for cube_transform in cube_transforms.iter_mut() {
+            render_mesh( &cube_mesh, &cube_shader, cube_transform.mat() );
+
+            cube_transform.set_rotation(
+                *cube_transform.rotation() +
+                ( Vector3::new( 0.5, 0.3, -0.1 ) * delta_time )
+            );
 
         }
+
+        // draw light ===============================================
+
+        light_shader.use_program();
+
+        light_shader.set_matrix4_by_name("view", &view_mat);
+        light_shader.set_matrix4_by_name("projection", &perspective_projection);
+
+        light_shader.set_rgb_by_name("lightColor", &light_color.as_rgb() );
+        
+        render_mesh( &cube_mesh, &light_shader, light_transform.mat() );
+
 
         window.gl_swap_window();
 
@@ -306,25 +361,10 @@ fn main() {
 
 }
 
-pub fn render_cube(
-    model_matrix:&Matrix4x4,
-    model_id:GLint,
-    index_count:usize
-) {
+fn render_mesh( mesh:&mesh::Mesh, shader:&shader::ShaderProgram, model_mat:&Matrix4x4 ) {
 
-    unsafe {
-        gl::UniformMatrix4fv(
-            model_id, 1, gl::FALSE,
-            model_matrix.as_array().as_ptr()
-        );
-
-        gl::DrawElements(
-            gl::TRIANGLES,
-            index_count as GLint,
-            gl::UNSIGNED_INT,
-            core::ptr::null_mut() as *const GLvoid
-        );
-    }
+    shader.set_matrix4_by_name( "model", model_mat );
+    mesh.render();
 
 }
 
@@ -369,6 +409,13 @@ fn process_input( input:&mut Input, key_code:Option<Keycode>, is_down:bool ) {
                     }
                 },
                 Keycode::LShift => {
+                    if is_down {
+                        input.speed_up = true;
+                    } else {
+                        input.speed_up = false;
+                    }
+                },
+                Keycode::LCtrl => {
                     if is_down {
                         input.down = true;
                     } else {

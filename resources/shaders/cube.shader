@@ -69,11 +69,17 @@ struct Material {
 
 struct Light {
 
-    vec3 position;
+    vec4 position;
 
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
+
+    float strength;
+
+    float constant;
+    float linear;
+    float quadratic;
 
 };
 
@@ -90,12 +96,21 @@ void main()
     vec3 diffuse_texture = vec3( texture( material.diffuse, v2f.uv ) );
     vec3 specular_texture = vec3( texture( material.specular, v2f.uv ) );
 
+    // attenuation formula
+    // 1.0 / ( constant + linear * distance + quadratic * ( distance * distance ) )
+    float dist = length( light.position.xyz - v2f.world_space_position.xyz );
+    float attenuation = 1.0 / ( light.constant + light.linear * dist + light.quadratic * ( dist * dist ) );
+    attenuation = max( attenuation * light.strength, 0.0 );
+
     vec3 ambient = light.ambient * diffuse_texture;
 
     // normalized here because of interpolation
     vec3 normal = normalize( v2f.world_space_normal );
 
-    vec3 lightDirection = normalize( light.position - v2f.world_space_position.xyz );
+    vec3 lightDirection = vec3( 0.0, 0.0, 0.0 );
+    // light position
+    lightDirection = normalize( light.position.xyz - v2f.world_space_position.xyz );
+
     float diff = max( dot( lightDirection, normal ), 0.0 );
     vec3 diffuse = light.diffuse * ( diff * diffuse_texture );
 
@@ -103,6 +118,10 @@ void main()
     vec3 reflectDirection = reflect( -lightDirection, normal );
     float spec = pow( max( dot( viewDirection, reflectDirection ), 0.0 ), material.shininess );
     vec3 specular = light.specular * ( spec * specular_texture );
+
+    diffuse  *= attenuation;
+    specular *= attenuation;
+    ambient  *= attenuation;
 
     vec3 result = ambient + diffuse + specular;
     FRAG_COLOR = vec4( result, 1.0 );
