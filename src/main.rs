@@ -37,12 +37,14 @@ fn main() {
         sdl2::pixels::PixelFormatEnum::RGBA32
     ).unwrap();
 
+    let title = "OpenGL | Spotlight Demo";
+
     let mut window = {
         let video = sdl.video().unwrap();
         let gl_attr = video.gl_attr();
         gl_attr.set_context_profile( sdl2::video::GLProfile::Core );
         gl_attr.set_context_version(3, 3);
-        video.window("OpenGL", 1280, 720)
+        video.window( title, 1280, 720)
             .opengl()
             .position_centered()
             .input_grabbed()
@@ -65,8 +67,10 @@ fn main() {
     let mut event_pump = sdl.event_pump().unwrap();
     let _timer = sdl.timer().unwrap();
 
+    // NOTE: clear color
     // let clear_color = color::RGB::from_hex("#776094").unwrap();
-    let clear_color = color::RGB::from_hex("#000000").unwrap();
+    // let clear_color = color::RGB::from_hex("#000000").unwrap();
+    let clear_color = color::RGB::from_hex("#050505").unwrap();
     opengl_fn::set_clear_color( &clear_color );
     unsafe {
         gl::Viewport(0 as GLint, 0 as GLint, 1280, 720);
@@ -94,7 +98,7 @@ fn main() {
     let mut counter = 0;
 
     let xy_range = 5.0;
-    let z_range  = 20.0;
+    let z_range  = 10.0;
     let rot_range = 180.0;
 
     while counter < cube_count {
@@ -104,7 +108,7 @@ fn main() {
             Vector3::new(
                 rng.gen_range( -xy_range..xy_range ),
                 rng.gen_range( -xy_range..xy_range ),
-                rng.gen_range( -z_range..0.0 )
+                rng.gen_range( -z_range..-1.0 )
             )
         );
         cube_transforms[counter].set_rotation(
@@ -143,11 +147,11 @@ fn main() {
     let light_color = color::HSV::new( 0.0, 0.0, 1.0 );
     let light_rgb = light_color.as_rgb();
 
-    cube_shader.set_vector3_by_name("light.ambient", &(Vector3::new_one() * 0.2) );
     // light color
+    cube_shader.set_vector3_by_name("light.ambient", &Vector3::new_zero() );
     cube_shader.set_rgb_by_name("light.diffuse", &light_rgb );
     cube_shader.set_vector3_by_name("light.specular", &Vector3::new( 1.0, 1.0, 1.0 ) );
-    let cube_shader_light_position_location = cube_shader.get_uniform_location("light.position");
+    // let cube_shader_light_position_location = cube_shader.get_uniform_location("light.position");
 
     // loading diffuse and specular textures
     unsafe {
@@ -206,12 +210,18 @@ fn main() {
     cube_shader.set_f32_by_name( "material.shininess", &16.0);
 
     cube_shader.set_f32_by_name( "light.constant",  &1.0   );
-    cube_shader.set_f32_by_name( "light.linear",    &0.09  );
-    cube_shader.set_f32_by_name( "light.quadratic", &0.032 );
+    cube_shader.set_f32_by_name( "light.linear",    &0.14  );
+    cube_shader.set_f32_by_name( "light.quadratic", &0.07 );
+
+    // NOTE: using the cosine of the desired cone cutoff angle because the dot prod of 
+    // light direction and spot direction is a cosine value, not an angular value
+    cube_shader.set_f32_by_name( "light.cutoff", &d2r( 20.0 ).cos() );
+    cube_shader.set_f32_by_name( "light.outerCutoff", &d2r( 24.0 ).cos() );
 
     light_shader.use_program();
-    let mut light_color = color::HSV::new( 0.0, 0.0, 1.0 );
-    light_shader.set_rgb_by_name("lightColor", &light_color.as_rgb() );
+    // #[allow(unused_mut)]
+    // let mut light_color = color::HSV::new( 0.0, 0.0, 1.0 );
+    // light_shader.set_rgb_by_name("lightColor", &light_color.as_rgb() );
 
     unsafe { gl::Enable( gl::DEPTH_TEST ); }
 
@@ -306,9 +316,9 @@ fn main() {
             &camera_up
         );
 
-        let mut new_light_position = light_transform.position().clone();
-        new_light_position[1] = light_position_y + ( elapsed.sin() * 2.0 );
-        light_transform.set_position( new_light_position );
+        // let mut new_light_position = light_transform.position().clone();
+        // new_light_position[1] = light_position_y + ( elapsed.sin() * 2.0 );
+        // light_transform.set_position( new_light_position );
 
         unsafe {
             gl::Clear( gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT );
@@ -316,19 +326,17 @@ fn main() {
     
         cube_shader.use_program();
 
-        let light_strength = elapsed.cos() + 2.0;
-        light_color = color::HSV::new( 0.0, 0.0, light_strength / 3.0 );
+        // let light_strength = elapsed.cos() + 2.0;
+        // light_color = color::HSV::new( 0.0, 0.0, light_strength / 3.0 );
 
-        cube_shader.set_f32_by_name( "light.strength",  &light_strength );
+        cube_shader.set_f32_by_name( "light.strength",  &1.5 );
 
         cube_shader.set_matrix4_by_name("view", &view_mat);
         cube_shader.set_matrix4_by_name("projection", &perspective_projection);
         cube_shader.set_vector3_by_name("view_position", &camera_position);
 
-        cube_shader.set_vector4(
-            cube_shader_light_position_location,
-            &light_transform.position().as_vector4()
-        );
+        cube_shader.set_vector4_by_name( "light.position", &camera_position.as_vector4() );
+        cube_shader.set_vector3_by_name( "light.direction", &camera_front );
         
         for cube_transform in cube_transforms.iter_mut() {
             render_mesh( &cube_mesh, &cube_shader, cube_transform.mat() );
@@ -342,14 +350,14 @@ fn main() {
 
         // draw light ===============================================
 
-        light_shader.use_program();
+        // light_shader.use_program();
 
-        light_shader.set_matrix4_by_name("view", &view_mat);
-        light_shader.set_matrix4_by_name("projection", &perspective_projection);
+        // light_shader.set_matrix4_by_name("view", &view_mat);
+        // light_shader.set_matrix4_by_name("projection", &perspective_projection);
 
-        light_shader.set_rgb_by_name("lightColor", &light_color.as_rgb() );
+        // light_shader.set_rgb_by_name("lightColor", &light_color.as_rgb() );
         
-        render_mesh( &cube_mesh, &light_shader, light_transform.mat() );
+        // render_mesh( &cube_mesh, &light_shader, light_transform.mat() );
 
 
         window.gl_swap_window();

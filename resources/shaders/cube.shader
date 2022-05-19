@@ -70,6 +70,9 @@ struct Material {
 struct Light {
 
     vec4 position;
+    vec3 direction;
+    float cutoff;
+    float outerCutoff;
 
     vec3 ambient;
     vec3 diffuse;
@@ -107,10 +110,13 @@ void main()
     // normalized here because of interpolation
     vec3 normal = normalize( v2f.world_space_normal );
 
-    vec3 lightDirection = vec3( 0.0, 0.0, 0.0 );
-    // light position
-    lightDirection = normalize( light.position.xyz - v2f.world_space_position.xyz );
+    vec3 lightDirection = normalize( light.position.xyz - v2f.world_space_position.xyz );
 
+    float theta = dot( lightDirection, normalize( -light.direction ) );
+    float epsilon = light.cutoff - light.outerCutoff;
+    float intensity = clamp( ( theta - light.outerCutoff ) / epsilon, 0.0, 1.0 );
+
+    // do lighting calculations
     float diff = max( dot( lightDirection, normal ), 0.0 );
     vec3 diffuse = light.diffuse * ( diff * diffuse_texture );
 
@@ -119,11 +125,13 @@ void main()
     float spec = pow( max( dot( viewDirection, reflectDirection ), 0.0 ), material.shininess );
     vec3 specular = light.specular * ( spec * specular_texture );
 
-    diffuse  *= attenuation;
-    specular *= attenuation;
+    diffuse  *= attenuation * intensity;
+    specular *= attenuation * intensity;
     ambient  *= attenuation;
 
     vec3 result = ambient + diffuse + specular;
+
+
     FRAG_COLOR = vec4( result, 1.0 );
 
 }
