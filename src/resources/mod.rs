@@ -14,9 +14,22 @@ pub use shader_loader::{
     load_shader_program_path
 };
 
+use crate::texture::*;
+
 static mut RESOURCES_PATH:String = String::new();
 pub fn get_resources_path() -> PathBuf {
     unsafe { PathBuf::from( RESOURCES_PATH.clone() ) }
+}
+
+pub fn load_texture( local_path:&str ) -> Result<TextureBuilder, Error> {
+    load_texture_path( resource_path_from_local_path( &format!( "textures/{}", local_path ) ) )
+}
+
+pub fn load_texture_path( path:PathBuf ) -> Result<TextureBuilder, Error> {
+    let dynamic_image = load_image_path( path )?;
+    let gl_image = ImageGL::from_dynamic_image( dynamic_image )
+        .map_err( |_| Error::LoadImage( format!("Error: Unsupported Image format!") ) )?;
+    Ok( Texture::new( gl_image ) )
 }
 
 pub fn load_image( local_path:&str ) -> Result<DynamicImage, Error> {

@@ -8,6 +8,9 @@ pub struct Input {
 
     pub speed_up:bool,
 
+    pub flashlight:bool,
+    pub flashlight_updated:bool,
+
     mouse_pos:Vector2,
     mouse_delta:Vector2,
 
@@ -23,11 +26,19 @@ impl Input {
 
             speed_up: false,
 
+            flashlight: false,
+            flashlight_updated: false,
+
             mouse_pos:Vector2::new_zero(),
             mouse_delta:Vector2::new_zero(),
 
             quit:false,
         }
+    }
+
+    pub fn toggle_flashlight( &mut self ) {
+        self.flashlight = !self.flashlight;
+        self.flashlight_updated = true;
     }
 
     pub fn set_mouse( &mut self, pos:Vector2 ) {

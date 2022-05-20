@@ -1,11 +1,14 @@
 use gl::types::*;
 use fmath::types::*;
-use super::c_string;
-use super::opengl_fn;
+use crate::{
+    c_string,
+    opengl_fn,
+    texture::TexCoord,
+};
 
 #[derive(Clone)]
 pub struct ShaderProgram {
-    id: GLuint
+    handle: GLuint
 }
 
 impl ShaderProgram {
@@ -14,9 +17,27 @@ impl ShaderProgram {
         unsafe {
             let c_name = c_string::c_string_from_str(name).unwrap();
             let location =
-                gl::GetUniformLocation( self.id() , c_name.as_ptr() as *const GLchar );
+                gl::GetUniformLocation( self.handle() , c_name.as_ptr() as *const GLchar );
             return location;
         }
+    }
+
+    pub fn set_sampler( &self, loc:GLint, value:&TexCoord ) {
+        self.set_i32( loc, value.get_id() );
+    }
+
+    pub fn set_sampler_by_name( &self, name:&str, value:&TexCoord ) {
+        self.set_sampler( self.get_uniform_location( name ), value );
+    }
+
+    pub fn set_u32( &self, loc:GLint, value:&u32 ) {
+        unsafe {
+            gl::Uniform1ui( loc, *value );
+        }
+    }
+
+    pub fn set_u32_by_name( &self, name:&str, value:&u32 ) {
+        self.set_u32( self.get_uniform_location( name ), value )
     }
 
     pub fn set_i32( &self, loc:GLint, value:&i32 ) {
@@ -83,37 +104,37 @@ impl ShaderProgram {
     }
 
     pub fn use_program(&self) {
-        unsafe { gl::UseProgram( self.id() ); }
+        unsafe { gl::UseProgram( self.handle() ); }
     }
 
-    pub fn id(&self) -> GLuint {
-        self.id
+    pub fn handle(&self) -> GLuint {
+        self.handle
     }
 
     pub fn from_shaders( shaders: &[Shader] ) -> Result<Self, Error> {
         unsafe {
-            let id:GLuint = gl::CreateProgram();
+            let handle:GLuint = gl::CreateProgram();
 
             for shader in shaders {
-                gl::AttachShader( id, shader.id() );
+                gl::AttachShader( handle, shader.handle() );
             }
 
-            gl::LinkProgram( id );
+            gl::LinkProgram( handle );
 
             let mut link_status:GLint = 1;
-            gl::GetProgramiv( id, gl::LINK_STATUS, &mut link_status );
+            gl::GetProgramiv( handle, gl::LINK_STATUS, &mut link_status );
 
             if FAILED == link_status {
                 return Err(
-                    Error::Linking( opengl_fn::gl_error_linking( id ) )
+                    Error::Linking( opengl_fn::gl_error_linking( handle ) )
                 )
             }
 
             for shader in shaders {
-                gl::DetachShader( id, shader.id() );
+                gl::DetachShader( handle, shader.handle() );
             }
 
-            return Ok( Self { id } );
+            return Ok( Self { handle } );
 
         }
     }
@@ -122,18 +143,18 @@ impl ShaderProgram {
 
 impl Drop for ShaderProgram {
     fn drop( &mut self ) {
-        unsafe { gl::DeleteProgram( self.id() ) }
+        unsafe { gl::DeleteProgram( self.handle() ) }
     }
 }
 
 pub struct Shader {
-    id: GLuint,
+    handle: GLuint,
 }
 
 impl Shader {
 
-    pub fn id(&self) -> GLuint {
-        self.id
+    pub fn handle(&self) -> GLuint {
+        self.handle
     }
 
     pub fn vert_from_source( src: &c_string::CStr ) -> Result<Self, Error> {
@@ -146,27 +167,27 @@ impl Shader {
 
     fn from_source( src: &c_string::CStr, kind:ShaderKind ) -> Result<Self, Error> {
 
-        let id:GLuint = Self::create_shader( kind );
+        let handle:GLuint = Self::create_shader( kind );
         unsafe {
             gl::ShaderSource(
-                id, 1,
+                handle, 1,
                 &src.as_ptr(), core::ptr::null()
             );
-            gl::CompileShader( id );
+            gl::CompileShader( handle );
         }
 
         let mut compile_status:GLint = 1;
         unsafe {
-            gl::GetShaderiv( id, gl::COMPILE_STATUS, &mut compile_status );
+            gl::GetShaderiv( handle, gl::COMPILE_STATUS, &mut compile_status );
         }
 
         if FAILED == compile_status {
             return Err(
-                Error::Compilation( opengl_fn::gl_error_compilation( id ))
+                Error::Compilation( opengl_fn::gl_error_compilation( handle ))
             );
         }
 
-        return Ok( Self{ id } );
+        return Ok( Self{ handle } );
 
     }
 
@@ -183,7 +204,7 @@ impl Drop for Shader {
 
     fn drop( &mut self ) {
         unsafe {
-            gl::DeleteShader( self.id() );
+            gl::DeleteShader( self.handle() );
         }
     }
 

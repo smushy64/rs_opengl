@@ -169,6 +169,88 @@ pub enum MeshData {
     UV,
 }
 
+pub fn generate_plane() -> Mesh {
+
+    let vertices:Vec<f32> = vec![
+        /* Positions */ -0.5,  0.5, 0.0, /* Color */ 1.0, 1.0, 1.0, /* Normals */  0.0, 0.0, 1.0, /* UVs */ 0.0, 1.0,
+        /* Positions */ -0.5, -0.5, 0.0, /* Color */ 1.0, 1.0, 1.0, /* Normals */  0.0, 0.0, 1.0, /* UVs */ 0.0, 0.0,
+        /* Positions */  0.5,  0.5, 0.0, /* Color */ 1.0, 1.0, 1.0, /* Normals */  0.0, 0.0, 1.0, /* UVs */ 1.0, 1.0,
+        /* Positions */  0.5, -0.5, 0.0, /* Color */ 1.0, 1.0, 1.0, /* Normals */  0.0, 0.0, 1.0, /* UVs */ 1.0, 0.0,
+    ];
+
+    let indeces:Vec<u32> = vec![
+        0, 1, 2,
+        2, 1, 3,
+    ];
+
+    Mesh::new( vertices )
+        .set_indeces( indeces )
+        .set_data_order(vec![
+            MeshData::Position,
+            MeshData::Color,
+            MeshData::Normal,
+            MeshData::UV,])
+        .build()
+
+}
+
+pub fn generate_cone() -> Mesh {
+
+    let vertices:Vec<f32> = vec![
+        // cone point | 0
+        /* Positions */ 0.0, 0.0, 0.0, /* Color */ 1.0, 1.0, 1.0, /* Normals */  0.0, 0.0, -1.0, /* UVs */ 0.0, 0.0,
+
+        // cone face | 1.0 on Z axis
+
+        // top | 1
+        /* Positions */ 0.0,  1.0, 1.0, /* Color */ 1.0, 1.0, 1.0, /* Normals */  0.0,  1.0, 0.0, /* UVs */ 0.0, 0.0,
+        // bottom | 2
+        /* Positions */ 0.0, -1.0, 1.0, /* Color */ 1.0, 1.0, 1.0, /* Normals */  0.0, -1.0, 0.0, /* UVs */ 0.0, 0.0,
+
+        // left top | 3
+        /* Positions */ -0.8,  0.5, 1.0, /* Color */ 1.0, 1.0, 1.0, /* Normals */  -0.77,  0.77, 0.0, /* UVs */ 0.0, 0.0,
+        // left bottom | 4
+        /* Positions */ -0.8, -0.5, 1.0, /* Color */ 1.0, 1.0, 1.0, /* Normals */  -0.77, -0.77, 0.0, /* UVs */ 0.0, 0.0,
+
+        // right top | 5
+        /* Positions */ 0.8,  0.5, 1.0, /* Color */ 1.0, 1.0, 1.0, /* Normals */  0.77,  0.77, 0.0, /* UVs */ 0.0, 0.0,
+        // right bottom | 65
+        /* Positions */ 0.8, -0.5, 1.0, /* Color */ 1.0, 1.0, 1.0, /* Normals */  0.77, -0.77, 0.0, /* UVs */ 0.0, 0.0,
+    ];
+
+    let indeces:Vec<u32> = vec![
+        // top right
+        0, 1, 5,
+        // mid right
+        0, 5, 6,
+        // bottom right
+        0, 6, 2,
+        // bottom left
+        0, 4, 2,
+        // mid left
+        0, 3, 4,
+        // top left
+        0, 1, 3,
+        // cap right top
+        5, 1, 6,
+        // cap right bottom
+        6, 1, 2,
+        // cap left bottom
+        2, 3, 4,
+        // cap left top
+        2, 1, 3,
+    ];
+
+    Mesh::new( vertices )
+        .set_indeces( indeces )
+        .set_data_order(vec![
+            MeshData::Position,
+            MeshData::Color,
+            MeshData::Normal,
+            MeshData::UV,])
+        .build()
+}
+
 pub fn generate_cube() -> Mesh {
     let vertices:Vec<f32> = vec![
         // front
@@ -237,86 +319,3 @@ pub fn generate_cube() -> Mesh {
             MeshData::UV,])
         .build()
 }
-
-// let mut vbo:GLuint = 0;
-// let mut vao:GLuint = 0;
-// let mut ebo:GLuint = 0;
-
-// // load cube into gl
-// unsafe {
-//     use core::mem::size_of;
-
-//     // vertex array object
-//     gl::GenVertexArrays(1, &mut vao);
-//     gl::BindVertexArray(vao);
-
-//     // vertex buffer object
-//     gl::GenBuffers(1, &mut vbo);
-//     gl::BindBuffer( gl::ARRAY_BUFFER, vbo );
-//     gl::BufferData(
-//         gl::ARRAY_BUFFER,
-//         ( vertices.len() * size_of::<f32>() ) as GLsizeiptr,
-//         vertices.as_ptr() as *const GLvoid,
-//         gl::STATIC_DRAW
-//     );
-
-//     // ebo
-//     gl::GenBuffers(1, &mut ebo);
-//     gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
-//     gl::BufferData(
-//         gl::ELEMENT_ARRAY_BUFFER,
-//         ( indeces.len() * size_of::<u32>() ) as GLsizeiptr,
-//         indeces.as_ptr() as *const GLvoid,
-//         gl::STATIC_DRAW
-//     );
-
-//     // vertex attrib pointer
-//     let stride = 11;
-//     // vertices
-//     gl::EnableVertexAttribArray(0);
-//     gl::VertexAttribPointer(
-//         0, 3,
-//         gl::FLOAT, gl::FALSE,
-//         ( stride * size_of::<f32>() ) as GLsizei,
-//         0 as *const GLvoid
-//     );
-//     // vert colors
-//     gl::EnableVertexAttribArray(1);
-//     gl::VertexAttribPointer(
-//         1, 3,
-//         gl::FLOAT, gl::FALSE,
-//         ( stride * size_of::<f32>() ) as GLsizei,
-//         ( 3 * size_of::<f32>() ) as *const GLvoid
-//     );
-//     // normals
-//     gl::EnableVertexAttribArray(2);
-//     gl::VertexAttribPointer(
-//         2, 3,
-//         gl::FLOAT, gl::FALSE,
-//         ( stride * size_of::<f32>() ) as GLsizei,
-//         ( 6 * size_of::<f32>() ) as *const GLvoid
-//     );
-//     // texcoords
-//     gl::EnableVertexAttribArray(3);
-//     gl::VertexAttribPointer(
-//         3, 2,
-//         gl::FLOAT, gl::FALSE,
-//         ( stride * size_of::<f32>() ) as GLsizei,
-//         ( 9 * size_of::<f32>() ) as *const GLvoid
-//     );
-
-//     gl::BindVertexArray( 0 );
-//     gl::BindBuffer( gl::ARRAY_BUFFER, 0 );
-// }
-
-// gl::BindVertexArray( vao );
-// gl::BindBuffer( gl::ARRAY_BUFFER, ebo );
-
-// // draw main cube ===========================================
-
-// gl::DrawElements(
-//     gl::TRIANGLES,
-//     indeces.len() as GLint,
-//     gl::UNSIGNED_INT,
-//     core::ptr::null_mut() as *const GLvoid
-// );

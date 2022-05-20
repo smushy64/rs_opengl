@@ -4,6 +4,8 @@ extern crate gl;
 extern crate wavefront_obj_importer;
 extern crate rand;
 
+use std::rc::Rc;
+
 use rand::{thread_rng, Rng};
 
 pub mod resources;
@@ -12,86 +14,59 @@ pub mod c_string;
 pub mod opengl_fn;
 pub mod input;
 pub mod mesh;
+pub mod light;
+pub mod texture;
+use texture::{ Texture, TexCoord };
 
 use input::Input;
 pub mod transform;
 use transform::Transform;
 
+#[allow(unused_imports)]
 use gl::types::*;
+
 use fmath::types::*;
 use fmath::functions::angles::degrees_to_radians as d2r;
 
 fn main() {
 
     resources::initialize();
+    let mut rng = thread_rng();
 
     let sdl = sdl2::init().unwrap();
 
-    let icon = resources::load_image("program/images/icon.png").unwrap();
-    let mut icon_data = icon.to_rgba8().into_raw();
-
-    let icon_surface = sdl2::surface::Surface::from_data(
-        &mut icon_data,
-        icon.width(), icon.height(),
-        icon.width() * core::mem::size_of::<u32>() as u32,
-        sdl2::pixels::PixelFormatEnum::RGBA32
-    ).unwrap();
-
-    let title = "OpenGL | Spotlight Demo";
+    // NOTE: Application Title
+    let title = "OpenGL | Multiple Light Sources Demo";
+    let dimensions  = Vector2::new( 1280.0, 720.0 );
 
     let mut window = {
         let video = sdl.video().unwrap();
         let gl_attr = video.gl_attr();
         gl_attr.set_context_profile( sdl2::video::GLProfile::Core );
         gl_attr.set_context_version(3, 3);
-        video.window( title, 1280, 720)
+        video.window( title, dimensions[0] as u32, dimensions[1] as u32 )
             .opengl()
             .position_centered()
             .input_grabbed()
             .build().unwrap()
     };
 
-    window.set_icon( &icon_surface );
+    set_program_icon( "program/images/icon.png", &mut window );
+
     sdl.mouse().set_relative_mouse_mode( true );
 
-    drop( icon_surface );
-    drop( icon_data );
-    drop( icon );
-
     let gl_ctx = window.gl_create_context().unwrap();
-    gl::load_with(
-        |symbol|
-            window.subsystem().gl_get_proc_address(&symbol) as *const GLvoid
-    );
+    opengl_fn::load_functions( window.subsystem() );
 
     let mut event_pump = sdl.event_pump().unwrap();
-    let _timer = sdl.timer().unwrap();
+    let timer     = sdl.timer().unwrap();
 
     // NOTE: clear color
     // let clear_color = color::RGB::from_hex("#776094").unwrap();
-    // let clear_color = color::RGB::from_hex("#000000").unwrap();
-    let clear_color = color::RGB::from_hex("#050505").unwrap();
+    // let clear_color = color::RGB::from_hex("#b9d9eb").unwrap();
+    let clear_color = color::RGB::new_black();
     opengl_fn::set_clear_color( &clear_color );
-    unsafe {
-        gl::Viewport(0 as GLint, 0 as GLint, 1280, 720);
-    }
-
-    let cube_mesh = mesh::generate_cube();
-
-    let light_shader = resources::load_shader_program("shaders/light").unwrap();
-    let cube_shader = resources::load_shader_program( "shaders/cube" ).unwrap();
-
-    cube_shader.use_program();
-    
-    let aspect_ratio:f32 = 1280.0 / 720.0;
-
-    let perspective_projection = opengl_fn::persp(
-        d2r(80.0),
-        aspect_ratio,
-        0.01, 100.0
-    );
-
-    let mut rng = thread_rng();
+    opengl_fn::set_viewport( &dimensions );
 
     let cube_count = 10;
     let mut cube_transforms:Vec<Transform> = Vec::with_capacity( cube_count );
@@ -121,12 +96,6 @@ fn main() {
         counter += 1;
     }
 
-    let mut light_transform = Transform::new();
-    let light_position_y = 1.2;
-
-    light_transform.set_position( Vector3::new(1.0, light_position_y, 1.0) );
-    light_transform.set_scale( Vector3::new_one() * 0.2 );
-
     let mut input = Input::new();
     // NOTE: Camera Speed
     let slow_camera_speed:f32 = 1.5;
@@ -141,96 +110,173 @@ fn main() {
 
     let mut yaw   = -90.0;
     let mut pitch = 0.0;
-    
-    cube_shader.use_program();
-    
-    let light_color = color::HSV::new( 0.0, 0.0, 1.0 );
-    let light_rgb = light_color.as_rgb();
 
-    // light color
-    cube_shader.set_vector3_by_name("light.ambient", &Vector3::new_zero() );
-    cube_shader.set_rgb_by_name("light.diffuse", &light_rgb );
-    cube_shader.set_vector3_by_name("light.specular", &Vector3::new( 1.0, 1.0, 1.0 ) );
-    // let cube_shader_light_position_location = cube_shader.get_uniform_location("light.position");
+    let aspect_ratio:f32 = dimensions[0] / dimensions[1];
+    let perspective_projection = opengl_fn::persp(
+        d2r(80.0),
+        aspect_ratio,
+        0.01, 100.0
+    );
 
-    // loading diffuse and specular textures
-    unsafe {
+    let directional_light = light::DirectionalLight{
+        direction: Vector3::new_down(),
+        diffuse:   color::RGB::from_float_array_rgb([ 0.4, 0.4, 0.41 ]),
+        specular:  color::RGB::from_float_array_rgb([ 0.4, 0.4, 0.41 ]),
+        ambient:   color::RGB::new_black(),
+    };
 
-        let diffuse_texture =
-            resources::load_image("textures/container2.png").unwrap();
+    let default_shader = resources::load_shader_program( "shaders/default" ).unwrap();
+    // NOTE: using default shader!
+    default_shader.use_program();
+    default_shader.set_matrix4_by_name( "projection", &perspective_projection );
 
-        let specular_texture = 
-            resources::load_image( "textures/container2_specular.png" ).unwrap();
-        // let specular_texture = 
-        //     resources::load_image( "textures/container2_specular_colored.png" ).unwrap();
+    let container_diffuse = resources::load_texture( "container2.png" ).unwrap()
+        .set_linear_filtering()
+        .set_texcoord( TexCoord::ID(0) )
+        .build();
 
-        let mut diffuse_id = 0;
-        gl::GenTextures( 1, &mut diffuse_id );
-        gl::BindTexture( gl::TEXTURE_2D, diffuse_id );
+    let container_specular = resources::load_texture( "container2_specular.png" ).unwrap()
+        .set_linear_filtering()
+        .set_texcoord( TexCoord::ID(1) )
+        .build();
 
-        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as GLint );
-        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as GLint );
-        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint );
-        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as GLint );
+    container_diffuse.use_texture();
+    container_specular.use_texture();
 
-        gl::TexImage2D(
-            gl::TEXTURE_2D, 0, gl::RGB as GLint,
-            diffuse_texture.width() as GLint, diffuse_texture.height() as GLint,
-            0, gl::RGB, gl::UNSIGNED_BYTE,
-            diffuse_texture.to_rgb8().as_raw().as_ptr() as *const GLvoid
+    default_shader.set_sampler_by_name(
+        "material.diffuse_sampler",
+        container_diffuse.texcoord()
+    );
+    default_shader.set_sampler_by_name(
+        "material.specular_sampler",
+        container_specular.texcoord()
+    );
+    default_shader.set_f32_by_name( "material.glossiness", &32.0 );
+
+    default_shader.set_vector3_by_name(
+        "directional_light.direction",
+        &directional_light.direction
+    );
+    default_shader.set_rgb_by_name( "directional_light.ambient",  &directional_light.ambient  );
+    default_shader.set_rgb_by_name( "directional_light.diffuse",  &directional_light.diffuse  );
+    default_shader.set_rgb_by_name( "directional_light.specular", &directional_light.specular );
+
+    let cube_mesh = Rc::new( mesh::generate_cube() );
+
+    let ambient_hsv_value = 0.1;
+    let ( mut point_lights, mut light_hsv_list ) = {
+
+        let count = 4;
+        let mut lights:Vec<light::PointLight> = Vec::with_capacity( count );
+        let mut hsv:Vec<color::HSV> = Vec::with_capacity( count );
+        let mut i = 0;
+        while i < count {
+
+            let mut light_hsv = color::HSV::new(
+                rng.gen_range( 0.0..360.0 ),
+                1.0, 1.0
+            );
+
+            hsv.push( light_hsv.clone() );
+
+            let light_col = light_hsv.as_rgb();
+            light_hsv.set_value( ambient_hsv_value );
+            let ambient = light_hsv.as_rgb();
+
+            lights.push(
+                light::PointLight {
+
+                    position: Vector3::new(
+                        rng.gen_range( -xy_range..xy_range ),
+                        rng.gen_range( -xy_range..xy_range ),
+                        rng.gen_range( -z_range..-1.0 )
+                    ),
+
+                    diffuse:  light_col.clone(),
+                    specular: light_col.clone(),
+                    ambient,
+
+                    constant:  1.0,
+                    linear:    0.14,
+                    quadratic: 0.07,
+
+                    mesh: cube_mesh.clone()
+
+                }
+            );
+
+            i += 1;
+
+        }
+
+        ( lights, hsv )
+
+    };
+
+    for ( idx, light ) in point_lights.iter().enumerate() { 
+
+        default_shader.set_vector3_by_name( &format!("point_lights[{}].position", idx ),
+            &light.position
         );
-        gl::GenerateMipmap( gl::TEXTURE_2D );
 
-        let mut specular_id = 0;
-        gl::GenTextures( 1, &mut specular_id );
-        gl::BindTexture( gl::TEXTURE_2D, specular_id );
-
-        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as GLint );
-        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as GLint );
-        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as GLint );
-        gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as GLint );
-
-        gl::TexImage2D(
-            gl::TEXTURE_2D, 0, gl::RGB as GLint,
-            specular_texture.width() as GLint, specular_texture.height() as GLint,
-            0, gl::RGB, gl::UNSIGNED_BYTE,
-            specular_texture.to_rgb8().as_raw().as_ptr() as *const GLvoid
+        default_shader.set_f32_by_name( &format!("point_lights[{}].constant", idx ),
+            &light.constant
         );
-        gl::GenerateMipmap( gl::TEXTURE_2D );
 
-        gl::ActiveTexture( gl::TEXTURE0 );
-        gl::BindTexture( gl::TEXTURE_2D, diffuse_id );
-        gl::ActiveTexture( gl::TEXTURE1 );
-        gl::BindTexture( gl::TEXTURE_2D, specular_id );
+        default_shader.set_f32_by_name( &format!("point_lights[{}].linear", idx ),
+            &light.linear
+        );
+
+        default_shader.set_f32_by_name( &format!("point_lights[{}].quadratic", idx ),
+            &light.quadratic
+        );
 
     }
 
-    cube_shader.set_i32_by_name( "material.diffuse", &0 );  // use texcoord0
-    cube_shader.set_i32_by_name( "material.specular", &1 ); // use texcoord1
-    cube_shader.set_f32_by_name( "material.shininess", &16.0);
+    let mut spot_light = light::SpotLight {
+        position:  camera_position.clone(),
+        direction: camera_front.clone(),
 
-    cube_shader.set_f32_by_name( "light.constant",  &1.0   );
-    cube_shader.set_f32_by_name( "light.linear",    &0.14  );
-    cube_shader.set_f32_by_name( "light.quadratic", &0.07 );
+        inner_cutoff:    d2r(25.0).cos(),
+        outer_cutoff:    d2r(28.0).cos(),
 
-    // NOTE: using the cosine of the desired cone cutoff angle because the dot prod of 
-    // light direction and spot direction is a cosine value, not an angular value
-    cube_shader.set_f32_by_name( "light.cutoff", &d2r( 20.0 ).cos() );
-    cube_shader.set_f32_by_name( "light.outerCutoff", &d2r( 24.0 ).cos() );
+        constant:  1.0,
+        linear:    0.14,
+        quadratic: 0.07,
 
-    light_shader.use_program();
-    // #[allow(unused_mut)]
-    // let mut light_color = color::HSV::new( 0.0, 0.0, 1.0 );
-    // light_shader.set_rgb_by_name("lightColor", &light_color.as_rgb() );
+        diffuse:  color::RGB::new_white(),
+        specular: color::RGB::new_white(),
+        ambient:  color::RGB::new_white() * 0.1,
+
+    };
+
+    default_shader.set_vector3_by_name( "spot_lights[0].position", &spot_light.position );
+    default_shader.set_vector3_by_name( "spot_lights[0].direction", &spot_light.direction );
+
+    default_shader.set_f32_by_name( "spot_lights[0].inner_cutoff", &spot_light.inner_cutoff );
+    default_shader.set_f32_by_name( "spot_lights[0].outer_cutoff", &spot_light.outer_cutoff );
+
+    default_shader.set_f32_by_name( "spot_lights[0].constant", &spot_light.constant );
+    default_shader.set_f32_by_name( "spot_lights[0].linear", &spot_light.linear );
+    default_shader.set_f32_by_name( "spot_lights[0].quadratic", &spot_light.quadratic );
+
+    default_shader.set_rgb_by_name( "spot_lights[0].diffuse", &color::RGB::new_black() );
+    default_shader.set_rgb_by_name( "spot_lights[0].specular", &color::RGB::new_black() );
+    default_shader.set_rgb_by_name( "spot_lights[0].ambient", &color::RGB::new_black() );
+
+    let flat_shader = resources::load_shader_program( "shaders/flat" ).unwrap();
+
+    flat_shader.use_program();
+
+    flat_shader.set_matrix4_by_name( "projection", &perspective_projection );
 
     unsafe { gl::Enable( gl::DEPTH_TEST ); }
-
     let mut running:bool = true;
     while running {
 
         use sdl2::event::Event;
 
-        let elapsed = (_timer.ticks() as f32) / 1000.0;
+        let elapsed = (timer.ticks() as f32) / 1000.0;
         let delta_time = elapsed - last_elapsed;
 
         let last_mouse = mouse;
@@ -310,70 +356,128 @@ fn main() {
 
         }
 
-        let view_mat = opengl_fn::new_look_at_mat(
+        let camera_transform = opengl_fn::new_look_at_mat(
             &camera_position,
             &( camera_position + camera_front ),
             &camera_up
         );
 
-        // let mut new_light_position = light_transform.position().clone();
-        // new_light_position[1] = light_position_y + ( elapsed.sin() * 2.0 );
-        // light_transform.set_position( new_light_position );
+        opengl_fn::clear_screen();
 
-        unsafe {
-            gl::Clear( gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT );
-        }
-    
-        cube_shader.use_program();
+        default_shader.use_program();
 
-        // let light_strength = elapsed.cos() + 2.0;
-        // light_color = color::HSV::new( 0.0, 0.0, light_strength / 3.0 );
-
-        cube_shader.set_f32_by_name( "light.strength",  &1.5 );
-
-        cube_shader.set_matrix4_by_name("view", &view_mat);
-        cube_shader.set_matrix4_by_name("projection", &perspective_projection);
-        cube_shader.set_vector3_by_name("view_position", &camera_position);
-
-        cube_shader.set_vector4_by_name( "light.position", &camera_position.as_vector4() );
-        cube_shader.set_vector3_by_name( "light.direction", &camera_front );
+        default_shader.set_matrix4_by_name("camera_transform", &camera_transform);
+        default_shader.set_vector3_by_name("camera_position", &camera_position);
         
+        spot_light.position  = camera_position.clone();
+        spot_light.direction = camera_front.clone();
+
+        default_shader.set_vector3_by_name( "spot_lights[0].position", &spot_light.position );
+        default_shader.set_vector3_by_name( "spot_lights[0].direction", &spot_light.direction );
+
+        if input.flashlight_updated {
+            if input.flashlight {
+                default_shader.set_rgb_by_name( "spot_lights[0].diffuse", &spot_light.diffuse );
+                default_shader.set_rgb_by_name( "spot_lights[0].specular", &spot_light.specular );
+                default_shader.set_rgb_by_name( "spot_lights[0].ambient", &spot_light.ambient );
+            } else {
+                default_shader.set_rgb_by_name( "spot_lights[0].diffuse", &color::RGB::new_black() );
+                default_shader.set_rgb_by_name( "spot_lights[0].specular", &color::RGB::new_black() );
+                default_shader.set_rgb_by_name( "spot_lights[0].ambient", &color::RGB::new_black() );
+            }
+        }
+
+        for ( idx, light ) in point_lights.iter().enumerate() {
+
+            let name = format!("point_lights[{}].", idx);
+
+            default_shader.set_rgb_by_name( &format!("{}ambient", name ),
+                &light.ambient
+            );
+
+            default_shader.set_rgb_by_name( &format!("{}diffuse", name ),
+                &light.diffuse
+            );
+
+            default_shader.set_rgb_by_name( &format!("{}specular", name ),
+                &light.specular
+            );
+        }
+
         for cube_transform in cube_transforms.iter_mut() {
-            render_mesh( &cube_mesh, &cube_shader, cube_transform.mat() );
 
             cube_transform.set_rotation(
                 *cube_transform.rotation() +
-                ( Vector3::new( 0.5, 0.3, -0.1 ) * delta_time )
+                (Vector3::new( 0.2, 0.1, 0.3 ) * delta_time)
             );
+
+            render_mesh( &cube_mesh, &default_shader, &cube_transform );
+        }
+
+        flat_shader.use_program();
+
+        flat_shader.set_matrix4_by_name( "camera_transform", &camera_transform );
+        for ( idx, light ) in point_lights.iter_mut().enumerate() {
+
+            let mut current_hsv = light_hsv_list[idx].clone();
+
+            current_hsv.set_hue( current_hsv.hue() + delta_time * 50.0 );
+            light_hsv_list[idx] = current_hsv.clone();
+
+            let rgb = current_hsv.as_rgb();
+
+            light.diffuse  = rgb;
+            light.specular = rgb;
+
+            current_hsv.set_value( ambient_hsv_value );
+
+            light.ambient = current_hsv.as_rgb();
+
+            render_point_light( light, &flat_shader );
 
         }
 
-        // draw light ===============================================
-
-        // light_shader.use_program();
-
-        // light_shader.set_matrix4_by_name("view", &view_mat);
-        // light_shader.set_matrix4_by_name("projection", &perspective_projection);
-
-        // light_shader.set_rgb_by_name("lightColor", &light_color.as_rgb() );
-        
-        // render_mesh( &cube_mesh, &light_shader, light_transform.mat() );
-
-
         window.gl_swap_window();
 
+        input.flashlight_updated = false;
+
     }
+
+    let textures:Vec<Texture> = Vec::from([
+        container_diffuse, container_specular
+    ]);
+
+    texture::delete_textures( textures );
 
     drop( gl_ctx );
     drop( sdl );
 
 }
 
-fn render_mesh( mesh:&mesh::Mesh, shader:&shader::ShaderProgram, model_mat:&Matrix4x4 ) {
+fn render_point_light( light:&light::PointLight, shader:&shader::ShaderProgram ) {
+    shader.set_rgb_by_name( "color", &light.diffuse );
+    render_mesh( &light.mesh, &shader, &light.transform() );
+}
 
-    shader.set_matrix4_by_name( "model", model_mat );
+fn render_mesh( mesh:&mesh::Mesh, shader:&shader::ShaderProgram, transform:&Transform ) {
+
+    shader.set_matrix4_by_name( "transform", transform.mat() );
     mesh.render();
 
+}
+
+fn set_program_icon( icon_path:&str, window:&mut sdl2::video::Window ) {
+    let icon = resources::load_image( icon_path ).unwrap();
+    let mut icon_data = icon.to_rgba8().into_raw();
+
+    let icon_surface = sdl2::surface::Surface::from_data(
+        &mut icon_data,
+        icon.width(), icon.height(),
+        icon.width() * core::mem::size_of::<u32>() as u32,
+        sdl2::pixels::PixelFormatEnum::RGBA32
+    ).unwrap();
+
+    window.set_icon( &icon_surface );
 }
 
 use sdl2::keyboard::Keycode;
@@ -435,6 +539,11 @@ fn process_input( input:&mut Input, key_code:Option<Keycode>, is_down:bool ) {
                         input.quit_game();
                     }
                 },
+                Keycode::F => {
+                    if is_down {
+                        input.toggle_flashlight();
+                    }
+                }
                 _ => {}
             }
         },

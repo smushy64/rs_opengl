@@ -24,7 +24,6 @@ fn parse_shader_program( shader_program:String ) -> Result<ParsedShaderSource, E
     // PPD - Pre-processor directive
     const PPD_VERTEX:&str   = "#vertex";
     const PPD_FRAGMENT:&str = "#fragment";
-    const PPD_COMMENT_SINGLE:&str = "//";
 
     // split into lines
     let parts:Vec<&str> = shader_program.split('\n').collect();
@@ -36,13 +35,11 @@ fn parse_shader_program( shader_program:String ) -> Result<ParsedShaderSource, E
 
     for part in parts.iter() {
 
-        if part.contains(PPD_VERTEX) {
+        if part.contains( PPD_VERTEX ) {
             shader_kind = ShaderParserKind::Vertex;
             continue;
-        } else if part.contains(PPD_FRAGMENT) {
+        } else if part.contains( PPD_FRAGMENT ) {
             shader_kind = ShaderParserKind::Fragment;
-            continue;
-        } else if part.contains(PPD_COMMENT_SINGLE) {
             continue;
         }
 

@@ -9,24 +9,21 @@ layout ( location = 3 ) in vec2 UV;
 
 out struct {
 
-    vec4 position;
-    vec3 color;
-    vec3 normal;
-    vec2 uv;
+    vec3 local_position;
+    vec4 world_position;
 
 } v2f;
 
-uniform mat4 model;
-uniform mat4 view;
+uniform mat4 transform;
+uniform mat4 camera_transform;
 uniform mat4 projection;
 
 void main()
 {
-    v2f.position = vec4( Position, 1.0 );
-    v2f.color = Color;
-    v2f.uv = UV;
-    v2f.normal = normalize( Normal );
-    gl_Position = projection * view * model * v2f.position;
+    v2f.local_position = Position;
+    v2f.world_position = transform * vec4( Position, 1.0 );
+
+    gl_Position = projection * camera_transform * v2f.world_position;
 }
 
 #fragment -----------------------------------------------------------
@@ -35,18 +32,15 @@ void main()
 
 in struct {
 
-    vec4 position;
-    vec3 color;
-    vec3 normal;
-    vec2 uv;
+    vec3 local_position;
+    vec4 world_position;
 
 } v2f;
 
-uniform vec3 lightColor;
+uniform vec3 color;
 
 out vec4 FRAG_COLOR;
-
 void main()
 {
-    FRAG_COLOR = vec4( lightColor, 1.0 );
+    FRAG_COLOR = vec4( color, 1.0 );
 }

@@ -17,6 +17,10 @@ Textures from the [Learn OpenGL github repo](https://github.com/JoeyDeVries/Lear
 
 ## Progress Images
 
+### Multiple Light Sources
+
+![Multiple Light Sources](progress/multiple_lights.jpg)
+
 ### Spot Light
 
 ![Spot Light](progress/spot_light.jpg)
@@ -24,7 +28,3 @@ Textures from the [Learn OpenGL github repo](https://github.com/JoeyDeVries/Lear
 ### Point Light
 
 ![Point Light](progress/point_light.jpg)
-
-### Diffuse and Specular Mapping
-
-![Diffuse and Specular](progress/diffuse_specular.jpg)
