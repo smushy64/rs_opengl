@@ -29,25 +29,8 @@ fn main() {
 
     resources::initialize();
 
-    println!("1 - low poly sphere");
-    println!("2 - smooth shaded low poly sphere");
-    println!("3 - low poly suzanne");
-    println!("4 - subdivided suzanne\n\n");
-    print!("Make a selection: ");
-    let _ = stdout().flush();
-    let mut selection = String::new();
-    stdin().read_line( &mut selection ).unwrap();
-    let mesh_path = match selection.trim_end().parse::<u32>() {
-        Ok(res) => {
-            match res {
-                1 => { "obj/sphere.obj" },
-                2 => { "obj/smooth_sphere.obj" },
-                3 => { "obj/suzanne.obj" },
-                _ => { "obj/suzanne_hd.obj" }
-            }
-        },
-        Err(_) => "obj/suzanne_hd.obj",
-    };
+    let mesh_path = select_mesh();
+    // let mesh_path = "suzanne.obj";
 
     let sdl = sdl2::init().unwrap();
 
@@ -85,7 +68,7 @@ fn main() {
     let mut timer = Time::new();
 
     // NOTE: clear color
-    let clear_color = color::RGB::from_hex("#776094").unwrap();
+    let clear_color = color::RGB::from_hex("#f0b4cc").unwrap();
     opengl_fn::set_clear_color( &clear_color );
     opengl_fn::set_viewport( &program_info.dimensions );
 
@@ -102,13 +85,13 @@ fn main() {
 
     *camera.transform.yaw_mut() = d2r(-90.0);
 
-    let mesh = resources::load_mesh( mesh_path ).unwrap();
+    let mesh = resources::load_mesh( &mesh_path ).unwrap();
 
     let mesh_shader = resources::load_shader_program( "model" ).unwrap();
     mesh_shader.use_program();
 
     let mut mesh_transform = transform::Transform::new();
-    mesh_transform.translate( &( Vector3::new_back() * 2.2 ) );
+    mesh_transform.translate( &( Vector3::new_back() * 2.5 ) );
 
     let shader_transform_loc       = mesh_shader.get_uniform_location( "transform" );
     let shader_view_loc       = mesh_shader.get_uniform_location( "view" );
@@ -119,20 +102,21 @@ fn main() {
 
     mesh_shader.set_matrix4( shader_transform_loc, mesh_transform.transform_mat() );
     mesh_shader.set_matrix4_by_name( "projection", camera.projection() );
-    mesh_shader.set_vector3_by_name( "directional_light.direction", &-Vector3::new_one() );
+    mesh_shader.set_vector3_by_name( "directional_light.direction",
+        &-( Vector3::new_up() + ( Vector3::new_right() * 0.5 ) + ( Vector3::new_forward() ) ) );
 
-    let mut light_color = color::HSV::new( 0.0, 0.0, 1.0 );
+    let mut light_color = color::HSV::new( 320.0, 0.02, 1.0 );
 
     mesh_shader.set_rgb_by_name( "directional_light.color", &light_color.as_rgb() );
     light_color.set_saturation( 0.2 );
     light_color.set_value( 0.2 );
     mesh_shader.set_rgb_by_name( "directional_light.ambient_color", &light_color.as_rgb() );
 
-    let model_color = color::RGB::new_white();
+    let model_color = color::RGB::from_array_rgb( [200, 200, 200] );
 
     mesh_shader.set_rgb_by_name( "diffuse_color", &model_color );
-    mesh_shader.set_f32_by_name( "specular_strength", &0.5 );
-    mesh_shader.set_f32_by_name( "glossiness", &32.0 );
+    mesh_shader.set_f32_by_name( "specular_strength", &1.0 );
+    mesh_shader.set_f32_by_name( "glossiness", &64.0 );
 
     let mut mouse = Vector2::new_zero();
     unsafe { gl::Enable( gl::DEPTH_TEST ); }
@@ -195,7 +179,7 @@ fn main() {
         
         camera.transform.translate( &translation );
 
-        mesh_transform.rotate( &Vector3::new( 0.0, d2r(timer.delta_time() * 10.0), 0.0 ) );
+        mesh_transform.rotate( &Vector3::new( 0.0, d2r(timer.delta_time() * 5.0), 0.0 ) );
 
         normal_mat = Matrix4x4::transpose( mesh_transform.transform_mat().inverse().unwrap() ).as_matrix3x3();
 
@@ -308,4 +292,34 @@ fn process_input( input:&mut Input, key_code:Option<Keycode>, is_down:bool ) {
         },
         None => {},
     }
+}
+
+fn select_mesh() -> String {
+    println!("1 - cube");
+    println!("2 - sphere");
+    println!("3 - cone");
+    println!("4 - cylinder");
+    println!("5 - icosphere");
+    println!("6 - torus");
+    println!("7 - suzanne");
+    println!("\n\n");
+    print!("Select a mesh to load: ");
+    let _ = stdout().flush();
+    let mut selection = String::new();
+    stdin().read_line( &mut selection ).unwrap();
+    let mesh_path = match selection.trim_end().parse::<u32>() {
+        Ok(res) => {
+            match res {
+                2 => { "sphere.obj" },
+                3 => { "cone.obj" },
+                4 => { "cylinder.obj" },
+                5 => { "icosphere.obj" },
+                6 => { "torus.obj" },
+                7 => { "suzanne.obj" }
+                _ => { "cube.obj" },
+            }
+        },
+        Err(_) => "cube.obj",
+    };
+    format!("{}", mesh_path)
 }
