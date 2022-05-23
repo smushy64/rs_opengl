@@ -110,22 +110,3 @@ pub fn ortho(
         0.0, 0.0, 0.0, 1.0,
     ])
 }
-
-pub fn persp(
-    fov_rad:f32,
-    aspect:f32,
-    near:f32, far:f32
-) -> Matrix4x4 {
-
-    let a = 1.0 / ( aspect * ( fov_rad / 2.0 ).tan() );
-    let b = 1.0 / ( ( fov_rad / 2.0 ).tan() );
-    let c = -(( far + near ) / ( far - near ));
-    let d = -(( 2.0 * far * near ) / ( far - near ));
-
-    Matrix4x4::from_array([
-        a, 0.0, 0.0,  0.0,
-      0.0,   b, 0.0,  0.0,
-      0.0, 0.0,   c, -1.0,
-      0.0, 0.0,   d,  0.0,
-  ])
-}

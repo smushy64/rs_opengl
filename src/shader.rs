@@ -73,6 +73,19 @@ impl ShaderProgram {
         self.set_matrix4( self.get_uniform_location(name), value );
     }
 
+    pub fn set_matrix3( &self, loc:GLint, value:&Matrix3x3 ) {
+        unsafe {
+            gl::UniformMatrix3fv(
+                loc, 1, 
+                gl::FALSE, value.as_array().as_ptr()
+            );
+        }
+    }
+
+    pub fn set_matrix3_by_name( &self, name:&str, value:&Matrix3x3 ) {
+        self.set_matrix3( self.get_uniform_location(name), value );
+    }
+
     pub fn set_vector3( &self, loc:GLint, value:&Vector3 ) {
         unsafe {
             gl::Uniform3fv( loc, 1, value.as_array().as_ptr() );
@@ -95,7 +108,7 @@ impl ShaderProgram {
 
     pub fn set_rgb( &self, loc:GLint, value:&color::RGB ) {
         unsafe {
-            gl::Uniform3fv( loc, 1, value.as_float_rgb_array().as_ptr() );
+            gl::Uniform3fv( loc, 1, value.as_array_rgb_f32().as_ptr() );
         }
     }
 

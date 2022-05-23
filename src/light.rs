@@ -1,9 +1,7 @@
 use fmath::types::{ *, color::RGB };
 use crate::{
-    mesh::Mesh,
     transform::Transform,
 };
-use std::rc::Rc;
 
 pub struct DirectionalLight {
 
@@ -26,8 +24,6 @@ pub struct PointLight {
     pub constant:  f32,
     pub linear:    f32,
     pub quadratic: f32,
-
-    pub mesh:   Rc<Mesh>,
 
 }
 

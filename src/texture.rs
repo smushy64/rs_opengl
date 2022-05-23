@@ -166,7 +166,7 @@ impl TextureBuilder {
             if use_border_color {
                 gl::TexParameterfv(
                     gl::TEXTURE_2D, gl::TEXTURE_BORDER_COLOR,
-                    border_color.as_float_rgba_array().as_ptr()
+                    border_color.as_array_rgba_f32().as_ptr()
                 );
             }
 

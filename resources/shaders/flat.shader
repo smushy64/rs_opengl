@@ -3,9 +3,6 @@
 #version 330 core
 
 layout ( location = 0 ) in vec3 Position;
-layout ( location = 1 ) in vec3 Color;
-layout ( location = 2 ) in vec3 Normal;
-layout ( location = 3 ) in vec2 UV;
 
 out struct {
 
@@ -15,7 +12,7 @@ out struct {
 } v2f;
 
 uniform mat4 transform;
-uniform mat4 camera_transform;
+uniform mat4 view;
 uniform mat4 projection;
 
 void main()
@@ -23,7 +20,7 @@ void main()
     v2f.local_position = Position;
     v2f.world_position = transform * vec4( Position, 1.0 );
 
-    gl_Position = projection * camera_transform * v2f.world_position;
+    gl_Position = projection * view * v2f.world_position;
 }
 
 #fragment -----------------------------------------------------------

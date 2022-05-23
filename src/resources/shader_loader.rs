@@ -7,7 +7,7 @@ use super::{
 };
 
 pub fn load_shader_program( local_path:&str ) -> Result<ShaderProgram, Error> {
-    let mut path = resource_path_from_local_path(local_path);
+    let mut path = resource_path_from_local_path( &format!( "shaders/{}", local_path ) );
     path.set_extension("shader");
     load_shader_program_path(path)
 }

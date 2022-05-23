@@ -2,43 +2,45 @@ use fmath::types::*;
 
 pub struct Input {
     
-    pub front:bool, pub back: bool,
-    pub left: bool, pub right:bool,
-    pub up:   bool, pub down: bool,
+    pub forward: bool, pub back:  bool,
+    pub left:    bool, pub right: bool,
+    pub up:      bool, pub down:  bool,
 
-    pub speed_up:bool,
+    pub speed_up: bool,
 
-    pub flashlight:bool,
-    pub flashlight_updated:bool,
+    mouse_pos:   Vector2,
+    mouse_delta: Vector2,
 
-    mouse_pos:Vector2,
-    mouse_delta:Vector2,
-
-    quit:bool,
+    quit: bool,
 }
 
 impl Input {
     pub fn new() -> Input {
         Input {
-            front:false, back: false,
-            left: false, right:false,
-            up:   false, down: false,
+            forward: false, back:  false,
+            left:    false, right: false,
+            up:      false, down:  false,
 
             speed_up: false,
 
-            flashlight: false,
-            flashlight_updated: false,
+            mouse_pos:   Vector2::new_zero(),
+            mouse_delta: Vector2::new_zero(),
 
-            mouse_pos:Vector2::new_zero(),
-            mouse_delta:Vector2::new_zero(),
-
-            quit:false,
+            quit: false,
         }
     }
 
-    pub fn toggle_flashlight( &mut self ) {
-        self.flashlight = !self.flashlight;
-        self.flashlight_updated = true;
+    pub fn move_direction( &self ) -> Vector3 {
+        let direction = | negative:bool, positive:bool | -> f32 {
+            if positive == negative { return 0.0 }
+            else if positive { return  1.0 }
+            else { return -1.0 }
+        };
+        Vector3::new(
+            direction( self.left, self.right ),
+            direction( self.down, self.up ),
+            direction( self.back, self.forward ),
+        )
     }
 
     pub fn set_mouse( &mut self, pos:Vector2 ) {

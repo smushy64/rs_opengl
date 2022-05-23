@@ -13,9 +13,15 @@ Crates in use:
 
 Textures from the [Learn OpenGL github repo](https://github.com/JoeyDeVries/LearnOpenGL)
 
+Suzanne model by the [Blender Foundation](https://www.blender.org/)
+
 ### [Demos](bin/releases/)
 
 ## Progress Images
+
+### Load .obj
+
+![Load .obj](progress/load_obj.jpg)
 
 ### Multiple Light Sources
 
@@ -24,7 +30,3 @@ Textures from the [Learn OpenGL github repo](https://github.com/JoeyDeVries/Lear
 ### Spot Light
 
 ![Spot Light](progress/spot_light.jpg)
-
-### Point Light
-
-![Point Light](progress/point_light.jpg)
