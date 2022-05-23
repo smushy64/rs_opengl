@@ -19,14 +19,14 @@ Suzanne model by the [Blender Foundation](https://www.blender.org/)
 
 ## Progress Images
 
-### Load .obj
+### Load .obj | [Demo](bin/releases/load_obj/)
 
 ![Load .obj](progress/load_obj.jpg)
 
-### Multiple Light Sources
+### Multiple Light Sources | [Demo](bin/releases/multiple_lights/)
 
 ![Multiple Light Sources](progress/multiple_lights.jpg)
 
-### Spot Light
+### Spot Light | [Demo](bin/releases/spot_light/)
 
 ![Spot Light](progress/spot_light.jpg)
