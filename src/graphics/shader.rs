@@ -1,10 +1,6 @@
 use gl::types::*;
 use fmath::types::*;
-use crate::{
-    c_string,
-    opengl_fn,
-    Rc
-};
+use crate::{ c_string, Rc };
 
 use super::{
     uniform::UniformInfo,
@@ -33,9 +29,7 @@ impl ShaderProgram {
             gl::GetProgramiv( handle, gl::LINK_STATUS, &mut link_status );
 
             if FAILED == link_status {
-                return Err(
-                    Error::Linking( opengl_fn::gl_error_linking( handle ) )
-                )
+                return Err( linking_error( handle ) );
             }
 
             for shader in shaders {
@@ -251,9 +245,7 @@ impl Shader {
         }
 
         if FAILED == compile_status {
-            return Err(
-                Error::Compilation( opengl_fn::gl_error_compilation( handle ))
-            );
+            return Err( compilation_error( handle ) );
         }
 
         return Ok( Self{ handle } );
@@ -289,4 +281,132 @@ const FAILED:GLint = 0;
 pub enum Error {
     Linking(String),
     Compilation(String),
+    Parse(String),
+}
+
+impl Error {
+    pub fn msg(&self) -> String {
+        match self {
+            Error::Linking( s )     => s.clone(),
+            Error::Compilation( s ) => s.clone(),
+            Error::Parse( s )       => s.clone(),
+        }
+    }
+}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.msg())
+    }
+}
+
+pub fn compilation_error( id:GLuint ) -> Error {
+    unsafe {
+        let mut len:GLint = 0;
+        gl::GetShaderiv( id, gl::INFO_LOG_LENGTH, &mut len );
+        let message = c_string::create_empty_c_string( len as usize );
+        gl::GetShaderInfoLog(
+            id, len,
+            core::ptr::null_mut(),
+            message.as_ptr() as *mut GLchar
+        );
+        return Error::Compilation(
+            format!(
+                "Shader Compilation Error: {}",
+                message.to_string_lossy().into_owned()
+            )
+        );
+    }
+}
+
+pub fn linking_error( id:GLuint ) -> Error {
+    unsafe {
+        let mut len:GLint = 0;
+        gl::GetProgramiv( id, gl::INFO_LOG_LENGTH, &mut len );
+        let message = c_string::create_empty_c_string( len as usize );
+        gl::GetProgramInfoLog(
+            id, len,
+            core::ptr::null_mut(),
+            message.as_ptr() as *mut GLchar
+        );
+        return Error::Linking(
+            format!(
+                "Shader Linking Error: {}",
+                message.to_string_lossy().into_owned()
+            )
+        );
+    }
+}
+
+pub fn shader_parser( shader_program:String ) -> Result<[Shader;2], Error> {
+
+    // PPD - Pre-processor directive
+    const PPD_VERTEX:&str   = "#vertex";
+    const PPD_FRAGMENT:&str = "#fragment";
+
+    // split into lines
+    let parts:Vec<&str> = shader_program.split('\n').collect();
+
+    let mut vert = String::new();
+    let mut frag = String::new();
+
+    let mut shader_kind = ParseKind::None;
+
+    for part in parts.iter() {
+
+        if part.contains( PPD_VERTEX ) {
+            shader_kind = ParseKind::Vertex;
+            continue;
+        } else if part.contains( PPD_FRAGMENT ) {
+            shader_kind = ParseKind::Fragment;
+            continue;
+        }
+
+        match shader_kind {
+            ParseKind::Vertex => {
+                vert.push_str(part);
+                vert.push('\n');
+            },
+            ParseKind::Fragment => {
+                frag.push_str(part);
+                frag.push('\n');
+            },
+            ParseKind::None => continue,
+        }
+
+    }
+
+    if vert.is_empty() || frag.is_empty() {
+        return Err(
+            Error::Parse(format!("Shader Parse Error: Shader is not formatted properly!"))
+        );
+    }
+
+    Ok(
+        [
+            Shader::vert_from_source(
+                &c_string::CString::new( vert.as_str() )
+                .map_err(|_|
+                    Error::Parse(
+                        format!("Shader Parse Error: File contains null character!")
+                    )
+                )?
+            )?,
+            Shader::frag_from_source(
+                &c_string::CString::new( frag.as_str() )
+                .map_err(|_|
+                    Error::Parse(
+                        format!("Shader Parse Error: File contains null character!")
+                    )
+                )?
+            )?,
+        ]
+    )
+
+}
+
+enum ParseKind {
+    Vertex,
+    Fragment,
+    None,
 }

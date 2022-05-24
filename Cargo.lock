@@ -431,11 +431,12 @@ dependencies = [
 
 [[package]]
 name = "opengl"
-version = "0.1.0"
+version = "0.4.0"
 dependencies = [
  "fmath",
  "gl",
  "image",
+ "rs_wavefront_obj_parser",
  "sdl2",
 ]
 
@@ -512,6 +513,11 @@ dependencies = [
  "crossbeam-utils",
  "num_cpus",
 ]
+
+[[package]]
+name = "rs_wavefront_obj_parser"
+version = "0.0.1"
+source = "git+https://github.com/smushy64/rs_wavefront_obj_parser.git#f4313e4cd24f6c915563b65da229a7f4aacfaec0"
 
 [[package]]
 name = "scoped_threadpool"

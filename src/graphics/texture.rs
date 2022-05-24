@@ -16,23 +16,6 @@ impl Texture {
         }
     }
 
-    pub fn handle( &self ) -> &GLuint { &self.handle }
-    pub fn width( &self )  -> &GLint  { &self.image.width }
-    pub fn height( &self ) -> &GLint  { &self.image.height }
-    pub fn image_data( &self ) -> &Vec<u8> { &self.image.data }
-    pub fn wrapping_x( &self ) -> &TextureWrapping { &self.options.wrapping_x }
-    pub fn wrapping_y( &self ) -> &TextureWrapping { &self.options.wrapping_y }
-    pub fn min_filtering( &self ) -> &TextureFiltering { &self.options.min_filtering }
-    pub fn mag_filtering( &self ) -> &TextureFiltering { &self.options.mag_filtering }
-
-    pub fn use_texture( &self, sampler:&Sampler, location:GLint ) {
-        unsafe {
-            gl::ActiveTexture( sampler.handle() );
-            gl::BindTexture( gl::TEXTURE_2D, *self.handle() );
-            gl::Uniform1i( location, *sampler.id() );
-        }
-    }
-
     pub fn new( image:ImageGL, options:TextureOptions ) -> Rc<Self> {
         let mut handle = 0;
 
@@ -105,14 +88,34 @@ impl Texture {
         Rc::new( Texture { handle, image, options } )
     }
 
+    pub fn handle( &self )        -> &GLuint           { &self.handle                }
+    pub fn width( &self )         -> &GLint            { &self.image.width           }
+    pub fn height( &self )        -> &GLint            { &self.image.height          }
+    pub fn image_data( &self )    -> &Vec<u8>          { &self.image.data            }
+    pub fn wrapping_x( &self )    -> &TextureWrapping  { &self.options.wrapping_x    }
+    pub fn wrapping_y( &self )    -> &TextureWrapping  { &self.options.wrapping_y    }
+    pub fn min_filtering( &self ) -> &TextureFiltering { &self.options.min_filtering }
+    pub fn mag_filtering( &self ) -> &TextureFiltering { &self.options.mag_filtering }
+
+    pub fn use_texture( &self, sampler:&Sampler, uniform_handle:GLint ) {
+        unsafe {
+            gl::ActiveTexture( sampler.handle() );
+            gl::BindTexture( gl::TEXTURE_2D, *self.handle() );
+            gl::Uniform1i( uniform_handle, *sampler.id() );
+        }
+    }
+
 }
 
 pub unsafe fn delete_textures( textures: Vec<Rc<Texture>> ) {
 
     let mut handles:Vec<GLuint> = Vec::with_capacity( textures.len() );
     for texture in textures.iter() {
-        // make sure each texture being deleted is not in use
-        assert!( Rc::strong_count( texture ) == 1 );
+        let ref_count = Rc::strong_count( texture );
+        if ref_count != 1 {
+            // make sure each texture being deleted is not in use
+            panic!( "Attempted to delete a texture that is still in use! Reference Count: {}", ref_count );
+        }
         handles.push( *texture.handle() );
     }
     drop( textures );

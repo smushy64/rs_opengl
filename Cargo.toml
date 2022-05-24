@@ -1,12 +1,11 @@
 [package]
-name = "opengl"
-version = "0.1.0"
+name    = "opengl"
+version = "0.4.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 fmath = { path = "W:/rs/fmath" }
-sdl2 = { version = "0.35.2", features = [ "bundled", "static-link" ] }
-gl = "0.14.0"
+sdl2  = { version = "0.35.2", features = [ "bundled", "static-link" ] }
+rs_wavefront_obj_parser = { git = "https://github.com/smushy64/rs_wavefront_obj_parser.git" }
+gl    = "0.14.0"
 image = "0.24.2"

@@ -4,31 +4,21 @@ extern crate gl;
 
 pub mod resources;
 pub mod c_string;
-pub mod opengl_fn;
 pub mod input;
 pub mod light;
 pub mod camera;
 pub mod time;
 pub mod transform;
-
 pub mod graphics;
-
-use graphics::{
-    Mesh, Model,
-    Material
-};
 
 pub use time::Time;
 pub use input::Input;
 pub use transform::Transform;
 
-#[allow(unused_imports)]
-use gl::types::*;
+use graphics::{ Mesh, Model, Material };
+use fmath::{ types::*, functions::angles::degrees_to_radians as d2r, };
 
-use fmath::types::*;
-use fmath::functions::angles::degrees_to_radians as d2r;
-
-use std::{io::{ stdin, stdout, Write }};
+use std::io::{ stdin, stdout, Write };
 pub use std::rc::Rc;
 
 fn main() {
@@ -67,7 +57,7 @@ fn main() {
     sdl.mouse().set_relative_mouse_mode( true );
 
     let gl_ctx = window.gl_create_context().unwrap();
-    opengl_fn::load_functions( window.subsystem() );
+    graphics::load_glfn( window.subsystem() );
 
     let mut event_pump = sdl.event_pump().unwrap();
     let sdl_timer = sdl.timer().unwrap();
@@ -75,8 +65,8 @@ fn main() {
 
     // NOTE: clear color
     let clear_color = color::RGB::from_hex("#444975").unwrap();
-    opengl_fn::set_clear_color( &clear_color );
-    opengl_fn::set_viewport( &program_info.dimensions );
+    graphics::clear_color( &clear_color );
+    graphics::set_viewport( &program_info.dimensions );
 
     let mut input = Input::new();
     // NOTE: Camera Speeds
@@ -96,7 +86,7 @@ fn main() {
         Vector3::new( d2r(-10.0), d2r(100.0), d2r(60.0) ),
         Vector3::new_one()
     );
-    let meshes = Rc::new( resources::load_meshes( mesh_path ).unwrap() );
+    let meshes = resources::load_meshes( mesh_path ).unwrap();
     let shader = resources::load_shader_program( "model" ).unwrap();
     let material = Material::new( "Ship", shader.clone() );
     let mut model = Model::new( meshes.clone(), material );
@@ -209,22 +199,26 @@ fn main() {
         mesh_transform.update_normal_matrix();
 
         // RENDER -------------------------------------------------------------------------------
-        
-        opengl_fn::clear_screen();
+        graphics::clear_screen(); {
 
-        model.material[transform_loc].set_matrix4( *mesh_transform.transform_matrix() );
-        model.material[view_loc].set_matrix4( camera.view() );
-        model.material[normal_loc].set_matrix3( *mesh_transform.normal_matrix() );
-        model.material[camera_pos_loc].set_vector3( *camera.transform.position() );
+            model.material[transform_loc].set_matrix4( *mesh_transform.transform_matrix() );
+            model.material[view_loc].set_matrix4( camera.view() );
+            model.material[normal_loc].set_matrix3( *mesh_transform.normal_matrix() );
+            model.material[camera_pos_loc].set_vector3( *camera.transform.position() );
+    
+            model.render();
 
-        model.render();
-        
-        window.gl_swap_window();
+        } window.gl_swap_window();
 
     }
 
-    drop( gl_ctx );
-    drop( sdl );
+    // clean up
+    {
+        drop( model );
+        unsafe { graphics::texture::delete_textures( vec![ diffuse_texture, specular_texture ] ) };
+        drop( gl_ctx );
+        drop( sdl );
+    }
 
 }
 

@@ -1,30 +1,27 @@
+extern crate rs_wavefront_obj_parser;
+
 #[allow(unused_imports)]
 use std::{
     env, fs,
     path::{ PathBuf, Path },
     ffi::{ CString, CStr }
 };
+use crate::{
+    graphics::{
+        *, texture::{ TextureOptions, ImageGL },
+        shader::shader_parser,
+    }, Rc
+};
 
 mod image_loader;
 pub use image_loader::DynamicImage;
 
-mod obj_loader;
-pub use obj_loader::{ parse_obj, object_to_glmesh, objects_to_glmeshes };
-
-mod shader_loader;
-pub use shader_loader::{
-    load_shader_program,
-    load_shader_program_path
-};
-
-use crate::{ graphics::{ *, texture::{ TextureOptions, ImageGL } }, Rc };
-
 static mut RESOURCES_PATH:String = String::new();
 pub fn get_resources_path() -> PathBuf {
-    unsafe { PathBuf::from( RESOURCES_PATH.clone() ) }
+    unsafe { PathBuf::from( &RESOURCES_PATH ) }
 }
 
-pub fn load_meshes( local_path:&str ) -> Result< Vec<Mesh>, Error > {
+pub fn load_meshes( local_path:&str ) -> Result< Rc<Vec<Mesh>>, Error > {
 
     let path = resource_path_from_local_path( &format!( "models/{}", local_path ) );
     
@@ -42,8 +39,20 @@ pub fn load_meshes( local_path:&str ) -> Result< Vec<Mesh>, Error > {
             match ext_str {
                 OBJ_EXT => {
                     let raw = load_string_path( &path )?;
-                    let objects = parse_obj( raw )?;
-                    Ok( objects_to_glmeshes( objects ) )
+                    let objects = rs_wavefront_obj_parser::parse_obj( raw )
+                        .map_err( |e| Error::OBJParse( e.msg() ) )?;
+                    let result = {
+                        let mut mesh_buffer:Vec<Mesh> = Vec::with_capacity( objects.len() );
+                        for object in objects {
+                            let ( vertices_raw, indeces ) = object.as_opengl_format();
+                            let vertices_formatted = unsafe {
+                                Vertex::from_vec_unchecked( vertices_raw )
+                            };
+                            mesh_buffer.push( Mesh::new( vertices_formatted, indeces ) )
+                        }
+                        mesh_buffer
+                    };
+                    Ok( Rc::new( result ) )
                 }
                 _ => return Err(
                     Error::UnrecognizedFileExt(
@@ -82,6 +91,19 @@ pub fn load_image( local_path:&str ) -> Result<DynamicImage, Error> {
 pub fn load_image_path( path:&PathBuf ) -> Result<DynamicImage, Error> {
     image_loader::load_image(path)
         .map_err( |e| Error::LoadImage(e) )
+}
+
+pub fn load_shader_program( local_path:&str ) -> Result<Rc<ShaderProgram>, Error> {
+    let mut path = resource_path_from_local_path( &format!( "shaders/{}", local_path ) );
+    path.set_extension("shader");
+    load_shader_program_path(&path)
+}
+
+pub fn load_shader_program_path( path:&PathBuf ) -> Result<Rc<ShaderProgram>, Error> {
+    let shader_source = shader_parser( load_string_path(path)? )
+        .map_err( |e| Error::ShaderParse(e.msg()) )?;
+    ShaderProgram::from_shaders( &shader_source )
+        .map_err( |e| Error::ShaderParse( e.msg() ) )
 }
 
 pub fn load_cstring( local_path:&str ) -> Result<CString, Error> {
@@ -184,19 +206,24 @@ pub enum Error {
 
 }
 
+impl Error {
+    pub fn msg( &self ) -> String {
+        match self {
+            Error::ReadFile            (s) => s.clone(),
+            Error::UTF8Conversion      (s) => s.clone(),
+            Error::CStringContainsNull (s) => s.clone(),
+            Error::LoadImage           (s) => s.clone(),
+            Error::ShaderParse         (s) => s.clone(),
+            Error::NoFileType          (s) => s.clone(),
+            Error::UnrecognizedFileExt (s) => s.clone(),
+            Error::OBJParse            (s) => s.clone(),
+        }
+    }
+}
+
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let msg = match self {
-            Error::ReadFile            (s) => s,
-            Error::UTF8Conversion      (s) => s,
-            Error::CStringContainsNull (s) => s,
-            Error::LoadImage           (s) => s,
-            Error::ShaderParse    (s) => s,
-            Error::NoFileType          (s) => s,
-            Error::UnrecognizedFileExt(s) => s,
-            Error::OBJParse       (s) => s,
-        };
-        write!( f, "{}", msg )
+        write!( f, "{}", self.msg() )
     }
 }
 
