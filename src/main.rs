@@ -27,14 +27,11 @@ fn main() {
 
     // let mesh_path = _select_mesh();
     let mesh_path = "space_ship.obj";
-
+    
     let sdl = sdl2::init().unwrap();
-
+    
     // NOTE: Application Title
-    let program_info = ProgramInfo {
-        title: format!("OpenGL | Load .obj Demo"),
-        dimensions: Vector2::new( 1280.0, 720.0 ),
-    };
+    let program_info = resources::load_program_info().unwrap();
 
     let mut window = {
         let video = sdl.video().unwrap();

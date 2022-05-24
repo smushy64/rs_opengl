@@ -11,8 +11,6 @@ Crates in use:
 - [fmath](https://github.com/smushy64/fmath)
 - [wavefront_obj](https://github.com/smushy64/rs_wavefront_obj_parser)
 
-Textures from the [Learn OpenGL github repo](https://github.com/JoeyDeVries/LearnOpenGL)
-
 ### [Demos](bin/releases/)
 
 ## Progress Images

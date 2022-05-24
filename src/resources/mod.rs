@@ -1,4 +1,4 @@
-extern crate rs_wavefront_obj_parser;
+extern crate wavefront_obj;
 
 #[allow(unused_imports)]
 use std::{
@@ -21,6 +21,45 @@ pub fn get_resources_path() -> PathBuf {
     unsafe { PathBuf::from( &RESOURCES_PATH ) }
 }
 
+pub fn load_program_info() -> Result<super::ProgramInfo, Error> {
+    let path = resource_path_from_local_path( "program/program_info.txt" );
+    let settings_src = load_string_path( &path )?;
+    let lines:Vec<&str> = settings_src.split('\n').collect();
+    let mut title = format!("OpenGL | ");
+    let mut dimensions = fmath::types::Vector2::new_zero();
+    for line in lines.iter() {
+        if line.contains( "[title] " ) {
+            let symbols:Vec<&str> = line.split("[title] ").collect();
+            if symbols.len() < 2 {
+                return Err(
+                    Error::ReadFile( format!("Load Settings Error: Formatted incorrectly!") )
+                )
+            }
+            title.push_str( symbols[1] );
+        }
+        if line.contains( "dimensions" ) {
+            let symbols:Vec<&str> = line.split_whitespace().collect();
+            if symbols.len() < 2 {
+                return Err(
+                    Error::ReadFile( format!("Load Settings Error: Formatted incorrectly!") )
+                )
+            }
+            let v = match symbols[1].parse::<f32>() {
+                Ok(res) => res,
+                Err(e) => return Err(
+                    Error::ReadFile( format!("Load Settings Error: {}", e) )
+                ),
+            };
+            if line.contains(".x") {
+                dimensions[0] = v;
+            } else if line.contains(".y") {
+                dimensions[1] = v;
+            }
+        }
+    }
+    return Ok( super::ProgramInfo{ title, dimensions } )
+}
+
 pub fn load_meshes( local_path:&str ) -> Result< Rc<Vec<Mesh>>, Error > {
 
     let path = resource_path_from_local_path( &format!( "models/{}", local_path ) );
@@ -39,7 +78,7 @@ pub fn load_meshes( local_path:&str ) -> Result< Rc<Vec<Mesh>>, Error > {
             match ext_str {
                 OBJ_EXT => {
                     let raw = load_string_path( &path )?;
-                    let objects = rs_wavefront_obj_parser::parse_obj( raw )
+                    let objects = wavefront_obj::parse_obj( raw )
                         .map_err( |e| Error::OBJParse( e.msg() ) )?;
                     let result = {
                         let mut mesh_buffer:Vec<Mesh> = Vec::with_capacity( objects.len() );

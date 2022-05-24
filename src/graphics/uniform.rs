@@ -48,8 +48,8 @@ impl MaterialUniform {
         Self { name, value: UniformValue::from_glenum( kind_glenum ) }
     }
 
-    pub fn name( &self )  -> &str          { &self.name }
-    pub fn value( &self ) -> &UniformValue { &self.value  }
+    pub fn name( &self )  -> &str          { &self.name  }
+    pub fn value( &self ) -> &UniformValue { &self.value }
 
     pub fn set_u32( &mut self, value:u32 ) {
         match self.value {
@@ -182,8 +182,8 @@ impl UniformValue {
                     gl::FALSE, v.as_ptr()
                 );
             },
-            UniformValue::Texture(v) => {
-                v.0.use_texture( &v.1, uniform_location );
+            UniformValue::Texture((tex, sampler)) => {
+                tex.use_texture( &sampler, uniform_location );
             },
             UniformValue::None => {},
         }

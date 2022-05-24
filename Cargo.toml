@@ -1,11 +1,11 @@
 [package]
 name    = "opengl"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 
 [dependencies]
 fmath = { path = "W:/rs/fmath" }
 sdl2  = { version = "0.35.2", features = [ "bundled", "static-link" ] }
-rs_wavefront_obj_parser = { git = "https://github.com/smushy64/rs_wavefront_obj_parser.git" }
+wavefront_obj = { git = "https://github.com/smushy64/rs_wavefront_obj_parser.git" }
 gl    = "0.14.0"
 image = "0.24.2"
