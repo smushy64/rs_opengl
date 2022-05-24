@@ -15,6 +15,10 @@ Crates in use:
 
 ## Progress Images
 
+### Stencil and Depth Buffer | [Demo](bin/releases/multiple_lights/)
+
+![Stencil and Depth Buffer](progress/stencil_depth.jpg)
+
 ### Advanced Mesh Loading | [Demo](bin/releases/advanced_mesh_loading/)
 
 ![Advanced Mesh Loading](progress/advanced_load_mesh.jpg)
@@ -22,7 +26,3 @@ Crates in use:
 ### Load .obj | [Demo](bin/releases/load_obj/)
 
 ![Load .obj](progress/load_obj.jpg)
-
-### Multiple Light Sources | [Demo](bin/releases/multiple_lights/)
-
-![Multiple Light Sources](progress/multiple_lights.jpg)

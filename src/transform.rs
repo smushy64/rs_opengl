@@ -1,4 +1,5 @@
 use fmath::types::*;
+use core::fmt;
 
 pub struct Transform {
     position: Vector3,
@@ -76,7 +77,7 @@ impl Transform {
 
     pub fn translate( &mut self, delta:&Vector3 ) { self.position = self.position + *delta; }
     pub fn rotate   ( &mut self, delta:&Vector3 ) { self.rotation = self.rotation + *delta; }
-    pub fn scale    ( &mut self, delta:&Vector3 ) { self.size     = self.size     + *delta; }
+    pub fn scale    ( &mut self, delta:&Vector3 ) { self.size = Vector3::scale( &self.size , &delta ); }
 
     pub fn forward( &self ) -> &Vector3 { &self.forward }
     pub fn right( &self )   -> &Vector3 { &self.right   }
@@ -143,8 +144,8 @@ impl Transform {
 
 }
 
-impl core::fmt::Display for Transform {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Transform {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f,
             "Position: {} Rotation (radians): {} Scale: {}",
             self.position(), self.rotation(), self.size()

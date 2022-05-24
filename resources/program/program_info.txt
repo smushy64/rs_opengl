@@ -1,3 +1,3 @@
-[title] Depth Testing
+[title] Stencil and Depth Buffer Demo
 [dimensions.x] 1280
 [dimensions.y] 720

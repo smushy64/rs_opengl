@@ -1,4 +1,5 @@
 use fmath::types::*;
+use core::fmt;
 
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -37,8 +38,8 @@ impl Vertex {
     }
 }
 
-impl core::fmt::Display for Vertex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Vertex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f, "position: {} normal: {} uv: {}", self.position, self.normal, self.uv )
     }
 }

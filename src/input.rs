@@ -30,7 +30,7 @@ impl Input {
         }
     }
 
-    pub fn move_direction( &self ) -> Vector3 {
+    pub fn direction( &self ) -> Vector3 {
         let direction = | negative:bool, positive:bool | -> f32 {
             if positive == negative { return 0.0 }
             else if positive { return  1.0 }

@@ -1,5 +1,5 @@
 extern crate wavefront_obj;
-
+use core::fmt;
 #[allow(unused_imports)]
 use std::{
     env, fs,
@@ -17,7 +17,7 @@ mod image_loader;
 pub use image_loader::DynamicImage;
 
 static mut RESOURCES_PATH:String = String::new();
-pub fn get_resources_path() -> PathBuf {
+fn get_resources_path() -> PathBuf {
     unsafe { PathBuf::from( &RESOURCES_PATH ) }
 }
 
@@ -198,7 +198,7 @@ pub fn load_bytes_path( path:&PathBuf ) -> Result<Vec<u8>, Error> {
 }
 
 const LOCAL_SEPARATOR:char = '/';
-pub fn resource_path_from_local_path( local_path:&str ) -> PathBuf {
+fn resource_path_from_local_path( local_path:&str ) -> PathBuf {
     let mut full_path = get_resources_path();
 
     if local_path.contains(LOCAL_SEPARATOR) {
@@ -260,8 +260,8 @@ impl Error {
     }
 }
 
-impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f, "{}", self.msg() )
     }
 }

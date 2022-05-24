@@ -1,4 +1,5 @@
 pub use std::ffi::{ CStr, CString };
+use core::fmt;
 
 pub fn create_empty_c_string( len:usize ) -> CString {
     let mut buffer:Vec<u8> = Vec::with_capacity( len + 1 );
@@ -30,4 +31,18 @@ pub fn to_string( c_string:CString ) -> String {
 #[derive(Debug)]
 pub enum Error {
     CStringToStr(String),
+}
+
+impl Error {
+    pub fn msg(&self) -> String {
+        match self {
+            Error::CStringToStr(s) => s.clone(),
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f, "{}", self.msg() )
+    }
 }

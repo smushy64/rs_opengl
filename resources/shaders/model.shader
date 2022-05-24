@@ -87,7 +87,6 @@ void main()
 
     vec3 fragmentPosition  = v2f.world_position.xyz;
     vec3 directionToCamera = normalize( camera_position - fragmentPosition );
-    vec3 lightDirection    = normalize( -directional_light.direction );
     vec3 normal            = normalize( v2f.world_normal );
 
     vec3 diffuse_sample  = vec3( texture(  diffuse_texture, v2f.uv ) );
@@ -97,10 +96,10 @@ void main()
 
     vec3 ambient = directional_light.ambient_color * diffuse_sample;
 
-    float diff   = PosDot( normal, lightDirection );
+    float diff   = PosDot( normal, directional_light.direction );
     vec3 diffuse = ( directional_light.color * diffuse_sample  ) * diff;
 
-    vec3 reflectDirection = reflect( -lightDirection, normal );
+    vec3 reflectDirection = reflect( -directional_light.direction, normal );
     float spec = pow( PosDot( directionToCamera, reflectDirection ), glossiness );
     vec3 specular = directional_light.color * spec * specular_sample;
 

@@ -1,5 +1,7 @@
 use gl::types::*;
 use crate::Rc;
+use core::fmt;
+use fmath::types::color::RGB;
 
 pub struct Texture {
     handle:GLuint,
@@ -16,63 +18,51 @@ impl Texture {
         }
     }
 
+    pub fn new_color_texture( color:RGB ) -> Rc<Self> {
+        let image = ImageGL {
+            width: 1, height: 1,
+            format: gl::RGB,
+            data: Vec::from( color.as_array_rgb() )
+        };
+        let options = TextureOptions::default();
+        Self::new( image, options )
+    }
+
     pub fn new( image:ImageGL, options:TextureOptions ) -> Rc<Self> {
         let mut handle = 0;
 
         unsafe {
 
-            use fmath::types::color::RGB;
-
             gl::GenTextures( 1, &mut handle );
             gl::BindTexture( gl::TEXTURE_2D, handle );
-
-            let mut use_border_color = false;
-            let mut border_color = RGB::new_clear();
-
-            let x_wrapping = match options.wrapping_x {
-                TextureWrapping::Repeat         => gl::REPEAT as GLint,
-                TextureWrapping::MirroredRepeat => gl::MIRRORED_REPEAT as GLint,
-                TextureWrapping::ClampToEdge    => gl::CLAMP_TO_EDGE as GLint,
-                TextureWrapping::ClampToBorder( color )  => {
-                    border_color = color;
-                    use_border_color = true;
-                    gl::CLAMP_TO_BORDER as GLint
+                
+            match options.border_color {
+                Some(c) => {
+                    gl::TexParameterfv(
+                        gl::TEXTURE_2D, gl::TEXTURE_BORDER_COLOR,
+                        c.as_array_rgba_f32().as_ptr()
+                    );
                 },
-            };
-
-            let y_wrapping = match options.wrapping_y {
-                TextureWrapping::Repeat         => gl::REPEAT as GLint,
-                TextureWrapping::MirroredRepeat => gl::MIRRORED_REPEAT as GLint,
-                TextureWrapping::ClampToEdge    => gl::CLAMP_TO_EDGE as GLint,
-                TextureWrapping::ClampToBorder( color )  => {
-                    border_color = color;
-                    use_border_color = true;
-                    gl::CLAMP_TO_BORDER as GLint
-                },
-            };
-
-            if use_border_color {
-                gl::TexParameterfv(
-                    gl::TEXTURE_2D, gl::TEXTURE_BORDER_COLOR,
-                    border_color.as_array_rgba_f32().as_ptr()
-                );
+                None => {},
             }
 
-            gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, x_wrapping );
-            gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, y_wrapping );
+            gl::TexParameteri(
+                gl::TEXTURE_2D, gl::TEXTURE_WRAP_S,
+                options.wrapping_x.as_glint()
+            );
+            gl::TexParameteri(
+                gl::TEXTURE_2D, gl::TEXTURE_WRAP_T,
+                options.wrapping_y.as_glint()
+            );
 
-            let min_filter = match options.min_filtering {
-                TextureFiltering::Nearest => gl::NEAREST as GLint,
-                TextureFiltering::Linear => gl::LINEAR as GLint,
-            };
-
-            let mag_filter = match options.mag_filtering {
-                TextureFiltering::Nearest => gl::NEAREST as GLint,
-                TextureFiltering::Linear => gl::LINEAR as GLint,
-            };
-
-            gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, min_filter );
-            gl::TexParameteri( gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, mag_filter );
+            gl::TexParameteri(
+                gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER,
+                options.min_filtering.as_glint()
+            );
+            gl::TexParameteri(
+                gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER,
+                options.mag_filtering.as_glint()
+            );
 
             gl::TexImage2D(
                 gl::TEXTURE_2D, 0, gl::RGB as GLint,
@@ -94,7 +84,7 @@ impl Texture {
     pub fn image_data( &self )    -> &Vec<u8>          { &self.image.data            }
     pub fn wrapping_x( &self )    -> &TextureWrapping  { &self.options.wrapping_x    }
     pub fn wrapping_y( &self )    -> &TextureWrapping  { &self.options.wrapping_y    }
-    pub fn min_filtering( &self ) -> &TextureFiltering { &self.options.min_filtering }
+    pub fn min_filtering( &self ) -> &MipmapFiltering  { &self.options.min_filtering }
     pub fn mag_filtering( &self ) -> &TextureFiltering { &self.options.mag_filtering }
 
     pub fn use_texture( &self, sampler:&Sampler, uniform_handle:GLint ) {
@@ -122,6 +112,7 @@ pub unsafe fn delete_textures( textures: Vec<Rc<Texture>> ) {
     gl::DeleteTextures( handles.len() as GLsizei, handles.as_ptr() );
 }
 
+#[derive(Clone)]
 pub struct Sampler { id:GLint }
 
 impl Sampler {
@@ -137,8 +128,8 @@ impl Sampler {
 
 }
 
-impl core::fmt::Display for Sampler {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Sampler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f, "TEXTURE {}\n", self.id() )
     }
 }
@@ -146,15 +137,21 @@ impl core::fmt::Display for Sampler {
 #[derive(Clone, Copy)]
 pub struct TextureOptions {
     wrapping_x:TextureWrapping, wrapping_y:TextureWrapping,
-    min_filtering:TextureFiltering, mag_filtering:TextureFiltering
+    min_filtering:MipmapFiltering, mag_filtering:TextureFiltering,
+    border_color:Option<RGB>
 }
 
 impl TextureOptions {
     pub fn default() -> Self {
         Self {
             wrapping_x: TextureWrapping::Repeat, wrapping_y: TextureWrapping::Repeat,
-            min_filtering: TextureFiltering::Nearest, mag_filtering: TextureFiltering::Linear,
+            min_filtering: MipmapFiltering::LinearLinear, mag_filtering: TextureFiltering::Linear,
+            border_color:None
         }
+    }
+
+    pub fn set_border_color( &mut self, c:RGB ) {
+        self.border_color = Some(c);
     }
 
     pub fn set_wrapping( &mut self, wrapping:TextureWrapping ) {
@@ -170,12 +167,7 @@ impl TextureOptions {
         self.wrapping_y = wrapping;
     }
 
-    pub fn set_filtering( &mut self, filtering:TextureFiltering ) {
-        self.min_filtering = filtering;
-        self.mag_filtering = filtering;
-    }
-
-    pub fn set_min_filtering( &mut self, filtering:TextureFiltering ) {
+    pub fn set_min_filtering( &mut self, filtering:MipmapFiltering ) {
         self.min_filtering = filtering;
     }
 
@@ -190,13 +182,52 @@ pub enum TextureWrapping {
     Repeat,
     MirroredRepeat,
     ClampToEdge,
-    ClampToBorder( fmath::types::color::RGB ),
+    ClampToBorder,
+}
+
+impl TextureWrapping {
+    pub fn as_glint( &self ) -> GLint {
+        match self {
+            Self::Repeat           => gl::REPEAT          as GLint,
+            Self::MirroredRepeat   => gl::MIRRORED_REPEAT as GLint,
+            Self::ClampToEdge      => gl::CLAMP_TO_EDGE   as GLint,
+            Self::ClampToBorder => gl::CLAMP_TO_BORDER as GLint,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
 pub enum TextureFiltering {
     Nearest,
     Linear,
+}
+
+impl TextureFiltering {
+    pub fn as_glint(&self) -> GLint {
+        match self {
+            Self::Nearest => gl::NEAREST as GLint,
+            Self::Linear  => gl::LINEAR  as GLint,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum MipmapFiltering {
+    NearestNearest,
+    LinearNearest,
+    NearestLinear,
+    LinearLinear,
+}
+
+impl MipmapFiltering {
+    pub fn as_glint(&self) -> GLint {
+        match self {
+            Self::NearestNearest => gl::NEAREST_MIPMAP_NEAREST as GLint,
+            Self::LinearNearest  => gl::LINEAR_MIPMAP_NEAREST  as GLint,
+            Self::NearestLinear  => gl::NEAREST_MIPMAP_LINEAR  as GLint,
+            Self::LinearLinear   => gl::LINEAR_MIPMAP_LINEAR   as GLint,
+        }
+    }
 }
 
 pub struct ImageGL {
@@ -228,7 +259,8 @@ impl ImageGL {
 
         Ok( 
             Self {
-                width: dynamic.width() as GLint, height: dynamic.height() as GLint,
+                width: dynamic.width() as GLint,
+                height: dynamic.height() as GLint,
                 format, data
             }
         )
@@ -242,8 +274,8 @@ pub enum Error {
     UnsupportedColorFormat(String),
 }
 
-impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let msg = match self {
             Error::UnsupportedColorFormat(s) => s,
         };

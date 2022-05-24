@@ -1,3 +1,5 @@
+use core::fmt;
+
 pub struct Time {
     
     elapsed_ticks: u32,
@@ -51,8 +53,8 @@ impl Time {
 
 }
 
-impl core::fmt::Display for Time {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Time {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "elapsed: {:7.4} delta: {:7.4}", self.elapsed_ms.t, self.delta_ms.t)
     }
 }

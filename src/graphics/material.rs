@@ -5,13 +5,15 @@ use super::{
 };
 use gl::types::*;
 
-use core::ops::{
-    Index, IndexMut
+use core::{
+    ops::{
+        Index, IndexMut
+    }, fmt
 };
 
 /// Uniforms indexable with usize or its name as &str
 /// 
-/// Indexing with &str is slow and could panic if uniform is not found!
+/// Indexing with &str is slow!
 #[allow(dead_code)]
 pub struct Material {
     name:       String,
@@ -27,6 +29,14 @@ impl Material {
             name: String::from( name ),
             shader_ref: shader,
             uniforms: material_uniforms
+        }
+    }
+
+    pub fn clone( &self ) -> Self {
+        Self {
+            name: format!( "{} 0", self.get_name() ),
+            shader_ref: self.shader_ref.clone(),
+            uniforms: self.uniforms.clone()
         }
     }
 
@@ -86,8 +96,8 @@ impl IndexMut<&str> for Material {
     }
 }
 
-impl core::fmt::Display for Material {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Material {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let msg = {
             let mut buffer = String::new();
             for (idx, uniform) in self.uniforms.iter().enumerate() {

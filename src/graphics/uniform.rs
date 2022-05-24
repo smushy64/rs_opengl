@@ -1,5 +1,6 @@
 use gl::types::*;
 use fmath::types::*;
+use core::fmt;
 
 use crate::Rc;
 
@@ -38,6 +39,7 @@ impl UniformInfo {
 
 }
 
+#[derive(Clone)]
 pub struct MaterialUniform {
     name:  String,
     value: UniformValue,
@@ -65,9 +67,9 @@ impl MaterialUniform {
         }
     }
 
-    pub fn set_texture( &mut self, value:( Rc<Texture>, Sampler ) ) {
+    pub fn set_texture( &mut self, tex:Rc<Texture>, sampler:Sampler ) {
         match self.value {
-            UniformValue::Texture(_) => { self.value = UniformValue::Texture( value ); },
+            UniformValue::Texture(_) => { self.value = UniformValue::Texture( ( tex, sampler ) ); },
             _ => {}
         }
     }
@@ -128,12 +130,13 @@ impl MaterialUniform {
 
 }
 
-impl core::fmt::Display for MaterialUniform {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for MaterialUniform {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f, "{}:   {}", self.name(), self.value() )
     }
 }
 
+#[derive(Clone)]
 pub enum UniformValue {
 
     F32(f32),
@@ -211,8 +214,8 @@ impl UniformValue {
 
 }
 
-impl core::fmt::Display for UniformValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for UniformValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let v = match self {
             UniformValue::F32(v)               => format!("( {:7.3} )", v),
             UniformValue::U32(v)               => format!("( {} )", v),

@@ -1,6 +1,7 @@
 use gl::types::*;
 use fmath::types::*;
 use crate::{ c_string, Rc };
+use core::fmt;
 
 use super::{
     uniform::UniformInfo,
@@ -294,8 +295,8 @@ impl Error {
     }
 }
 
-impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.msg())
     }
 }

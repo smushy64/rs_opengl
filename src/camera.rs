@@ -1,5 +1,6 @@
 use crate::transform::Transform;
 use fmath::types::*;
+use core::fmt;
 
 pub struct Camera {
     pub transform: Transform,
@@ -112,8 +113,8 @@ pub enum ProjectionMode {
     Perspective,
 }
 
-impl core::fmt::Display for ProjectionMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for ProjectionMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 
         let text = match self {
             ProjectionMode::Perspective => "Perspective",
