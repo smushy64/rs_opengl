@@ -15,9 +15,9 @@ impl Camera {
 
     pub fn view( &self ) -> Matrix4x4 {
         Matrix4x4::new_look_at(
-            self.transform.get_position(),
-            &( *self.transform.get_position() + self.transform.forward() ),
-            &Vector3::new_up()
+            self.transform.position(),
+            &( *self.transform.position() + *self.transform.forward() ),
+            self.transform.up()
         )
     }
 
@@ -32,7 +32,8 @@ impl Camera {
 }
 
 pub struct CameraBuilder {
-    transform: Transform,
+    position: Vector3,
+    rotation: Vector3,
 
     fov: f32,
     aspect_ratio: f32,
@@ -45,7 +46,8 @@ impl CameraBuilder {
 
     fn default( projection_mode:ProjectionMode ) -> Self {
         Self {
-            transform: Transform::new(),
+            position: Vector3::new_zero(),
+            rotation: Vector3::new_zero(),
             fov: 1.5708, // 90.0
             aspect_ratio: 1.77777,
             near: 0.1, far: 100.0,
@@ -53,8 +55,13 @@ impl CameraBuilder {
         }
     }
 
-    pub fn set_transform( mut self, transform:Transform ) -> Self {
-        self.transform = transform;
+    pub fn set_position( mut self, position:Vector3 ) -> Self {
+        self.position = position;
+        self
+    }
+
+    pub fn set_rotation( mut self, rotation:Vector3 ) -> Self {
+        self.rotation = rotation;
         self
     }
 
@@ -85,8 +92,13 @@ impl CameraBuilder {
             },
         };
 
+        let mut transform = Transform::new( self.position, self.rotation, Vector3::new_one() );
+
+        transform.use_world_up();
+        transform.update_basis_vectors();
+
         Camera {
-            transform: self.transform,
+            transform,
             projection_mat: projection,
             projection_mode: self.projection_mode,
         }

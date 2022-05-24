@@ -19,6 +19,14 @@ pub fn format_c_string_uniform_name( name:CString ) -> Result< CString, Error > 
     c_string_from_str( name_string.trim_end().trim_end_matches( char::from(0) ) )
 }
 
+pub fn to_string( c_string:CString ) -> String {
+    String::from(
+        c_string.to_string_lossy()
+            .trim_end()
+            .trim_end_matches( char::from( 0 ) )
+    )
+}
+
 #[derive(Debug)]
 pub enum Error {
     CStringToStr(String),

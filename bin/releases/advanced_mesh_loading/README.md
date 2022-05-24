@@ -1,10 +1,8 @@
-## Load .obj Demo
+## Advanced Mesh Loading
 
 Download and unzip, run `opengl.exe`.
 
 The program will not run without the resources folder present in the same directory.
-
-Suzanne model by the [Blender Foundation](https://www.blender.org/)
 
 ## Controls
 | Key            | Action                |
@@ -15,6 +13,4 @@ Suzanne model by the [Blender Foundation](https://www.blender.org/)
 | Mouse          | Look                  |
 | ESC            | Quit Application      |
 
-Select a mesh with 1-7 and press enter to load it
-
-![image](../../../progress/load_obj.jpg)
+![image](../../../progress/advanced_load_mesh.jpg)

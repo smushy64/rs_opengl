@@ -1,4 +1,4 @@
-use crate::shader::{ShaderProgram, Shader};
+use crate::{ graphics::{ShaderProgram, Shader}, Rc };
 
 use super::{
     resource_path_from_local_path,
@@ -6,17 +6,17 @@ use super::{
     CString, PathBuf, Error
 };
 
-pub fn load_shader_program( local_path:&str ) -> Result<ShaderProgram, Error> {
+pub fn load_shader_program( local_path:&str ) -> Result<Rc<ShaderProgram>, Error> {
     let mut path = resource_path_from_local_path( &format!( "shaders/{}", local_path ) );
     path.set_extension("shader");
-    load_shader_program_path(path)
+    load_shader_program_path(&path)
 }
 
-pub fn load_shader_program_path( path:PathBuf ) -> Result<ShaderProgram, Error> {
+pub fn load_shader_program_path( path:&PathBuf ) -> Result<Rc<ShaderProgram>, Error> {
     let shader_source = parse_shader_program( load_string_path(path)? )?;
 
     ShaderProgram::from_shaders(&[ shader_source.compiled_vertex()?, shader_source.compiled_fragment()? ])
-        .map_err( |e| Error::ShaderError(format!("{:?}", e)) )
+        .map_err( |e| Error::ShaderParse(format!("Parse Shader Error: {:?}", e)) )
 }
 
 fn parse_shader_program( shader_program:String ) -> Result<ParsedShaderSource, Error> {
@@ -59,16 +59,16 @@ fn parse_shader_program( shader_program:String ) -> Result<ParsedShaderSource, E
 
     if vert.is_empty() || frag.is_empty() {
         return Err(
-            Error::ShaderError(format!("Error: Shader is not formatted properly!"))
+            Error::ShaderParse(format!("Parse Shader Error: Shader is not formatted properly!"))
         );
     }
 
     Ok(
         ParsedShaderSource {
             vertex: CString::new( vert.as_str() )
-                .map_err(|_| Error::CStringContainsNull(format!("Error: File contains null character!")))?,
+                .map_err(|_| Error::CStringContainsNull(format!("CString Error: File contains null character!")))?,
             fragment: CString::new( frag.as_str() )
-                .map_err(|_| Error::CStringContainsNull(format!("Error: File contains null character!")))?,
+                .map_err(|_| Error::CStringContainsNull(format!("CString Error: File contains null character!")))?,
         }
     )
 
@@ -90,12 +90,12 @@ impl ParsedShaderSource {
 
     pub fn compiled_vertex(&self) -> Result<Shader, Error> {
         Shader::vert_from_source(self.get_vertex_source())
-            .map_err( |e| Error::ShaderError(format!( "{:?}", e )) )
+            .map_err( |e| Error::ShaderParse(format!( "{:?}", e )) )
     }
 
     pub fn compiled_fragment(&self) -> Result<Shader, Error> {
         Shader::frag_from_source(self.get_fragment_source())
-            .map_err( |e| Error::ShaderError(format!( "{:?}", e )) )
+            .map_err( |e| Error::ShaderParse(format!( "{:?}", e )) )
     }
 }
 

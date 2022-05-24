@@ -3,19 +3,24 @@ extern crate sdl2;
 extern crate gl;
 
 pub mod resources;
-pub mod shader;
 pub mod c_string;
 pub mod opengl_fn;
 pub mod input;
 pub mod light;
-pub mod texture;
 pub mod camera;
-pub mod geometry;
 pub mod time;
-use time::Time;
-
-use input::Input;
 pub mod transform;
+
+pub mod graphics;
+
+use graphics::{
+    Mesh, Model,
+    Material
+};
+
+pub use time::Time;
+pub use input::Input;
+pub use transform::Transform;
 
 #[allow(unused_imports)]
 use gl::types::*;
@@ -23,14 +28,15 @@ use gl::types::*;
 use fmath::types::*;
 use fmath::functions::angles::degrees_to_radians as d2r;
 
-use std::io::{ stdin, stdout, Write };
+use std::{io::{ stdin, stdout, Write }};
+pub use std::rc::Rc;
 
 fn main() {
 
     resources::initialize();
 
-    let mesh_path = select_mesh();
-    // let mesh_path = "suzanne.obj";
+    // let mesh_path = _select_mesh();
+    let mesh_path = "space_ship.obj";
 
     let sdl = sdl2::init().unwrap();
 
@@ -68,7 +74,7 @@ fn main() {
     let mut timer = Time::new();
 
     // NOTE: clear color
-    let clear_color = color::RGB::from_hex("#f0b4cc").unwrap();
+    let clear_color = color::RGB::from_hex("#444975").unwrap();
     opengl_fn::set_clear_color( &clear_color );
     opengl_fn::set_viewport( &program_info.dimensions );
 
@@ -81,47 +87,64 @@ fn main() {
         .set_aspect_ratio( program_info.aspect_ratio() )
         .set_fov( d2r( 65.0 ) )
         .set_clipping_fields( 0.001, 100.0 )
-        .build();
+        .set_rotation( Vector3::new( 0.0, d2r( -90.0 ), 0.0 ) )
+    .build();
 
-    *camera.transform.yaw_mut() = d2r(-90.0);
+    // NOTE: Mesh is loaded here!
+    let mut mesh_transform = Transform::new(
+        Vector3::new_back() * 5.0,
+        Vector3::new( d2r(-10.0), d2r(100.0), d2r(60.0) ),
+        Vector3::new_one()
+    );
+    let meshes = Rc::new( resources::load_meshes( mesh_path ).unwrap() );
+    let shader = resources::load_shader_program( "model" ).unwrap();
+    let material = Material::new( "Ship", shader.clone() );
+    let mut model = Model::new( meshes.clone(), material );
+    model.material.activate_shader();
 
-    let mesh = resources::load_mesh( &mesh_path ).unwrap();
+    let texture_options = graphics::texture::TextureOptions::default(); 
 
-    let mesh_shader = resources::load_shader_program( "model" ).unwrap();
-    mesh_shader.use_program();
+    let diffuse_texture =
+        resources::load_texture( "space_ship_diff.png", texture_options ).unwrap();
+    let specular_texture =
+        resources::load_texture( "space_ship_spec.png", texture_options ).unwrap();
 
-    let mut mesh_transform = transform::Transform::new();
-    mesh_transform.translate( &( Vector3::new_back() * 2.5 ) );
+    let transform_loc = model.material.get_uniform_location( "transform" ).unwrap();
+    let view_loc      = model.material.get_uniform_location( "view" ).unwrap();
+    let normal_loc    = model.material.get_uniform_location( "normal_mat" ).unwrap();
 
-    let shader_transform_loc       = mesh_shader.get_uniform_location( "transform" );
-    let shader_view_loc       = mesh_shader.get_uniform_location( "view" );
-    let shader_camerapos_loc  = mesh_shader.get_uniform_location( "camera_position" );
-    let shader_normal_mat_loc = mesh_shader.get_uniform_location( "normal_mat" );
-    let mut normal_mat  = Matrix3x3::new_identity();
-    mesh_shader.set_matrix3( shader_normal_mat_loc, &normal_mat );
+    let camera_pos_loc = model.material.get_uniform_location( "camera_position" ).unwrap();
 
-    mesh_shader.set_matrix4( shader_transform_loc, mesh_transform.transform_mat() );
-    mesh_shader.set_matrix4_by_name( "projection", camera.projection() );
-    mesh_shader.set_vector3_by_name( "directional_light.direction",
-        &-( Vector3::new_up() + ( Vector3::new_right() * 0.5 ) + ( Vector3::new_forward() ) ) );
+    model.material[view_loc].set_matrix4( camera.view() );
+    model.material["projection"].set_matrix4( *camera.projection() );
 
-    let mut light_color = color::HSV::new( 320.0, 0.02, 1.0 );
+    model.material[normal_loc].set_matrix3( *mesh_transform.normal_matrix() );
 
-    mesh_shader.set_rgb_by_name( "directional_light.color", &light_color.as_rgb() );
-    light_color.set_saturation( 0.2 );
-    light_color.set_value( 0.2 );
-    mesh_shader.set_rgb_by_name( "directional_light.ambient_color", &light_color.as_rgb() );
+    model.material["directional_light.direction"].set_vector3(
+        -( Vector3::new_up() + ( Vector3::new_forward() * 2.0 ) )
+    );
+    model.material["directional_light.color"].set_rgb( color::RGB::new_white() );
+    model.material["directional_light.ambient_color"].set_rgb( color::RGB::new_white() * 0.12 );
 
-    let model_color = color::RGB::from_array_rgb( [200, 200, 200] );
+    model.material[camera_pos_loc].set_vector3( *camera.transform.position() );
+    model.material["glossiness"].set_f32( 32.0 );
+    model.material["diffuse_texture"].set_texture( (
+        diffuse_texture.clone(),
+        graphics::texture::Sampler::new( 0 )
+    ) );
 
-    mesh_shader.set_rgb_by_name( "diffuse_color", &model_color );
-    mesh_shader.set_f32_by_name( "specular_strength", &1.0 );
-    mesh_shader.set_f32_by_name( "glossiness", &64.0 );
+    model.material["specular_texture"].set_texture( (
+        specular_texture.clone(),
+        graphics::texture::Sampler::new( 1 )
+    ) );
 
     let mut mouse = Vector2::new_zero();
+    let mouse_sens = 10.0;
     unsafe { gl::Enable( gl::DEPTH_TEST ); }
     let mut running:bool = true;
     while running {
+
+        // UPDATE -------------------------------------------------------------------------------
 
         use sdl2::event::Event;
 
@@ -157,20 +180,22 @@ fn main() {
 
         input.set_mouse_delta( mouse - last_mouse );
 
-        *camera.transform.yaw_mut()   += d2r(input.mouse_delta().x() * timer.delta_time() * 10.0);
-        *camera.transform.pitch_mut() -= d2r(input.mouse_delta().y() * timer.delta_time() * 10.0);
-        *camera.transform.pitch_mut()  = camera.transform.pitch().clamp( d2r( -75.0 ), d2r( 75.0 ) );
-
-        let up      = Vector3::new_up();
-        let forward = camera.transform.forward();
-        let right   = transform::Transform::calculate_right( &forward, &up );
+        camera.transform.rotate( &(
+            Vector3::new(
+                d2r( -input.mouse_delta()[1] ),
+                d2r(  input.mouse_delta()[0] ),
+                0.0
+            ) * timer.delta_time() * mouse_sens
+        ) );
+        camera.transform.rotation_mut()[0] = camera.transform.rotation()[0].clamp( d2r( -75.0 ), d2r( 75.0 ) );
+        camera.transform.update_basis_vectors();
 
         let input_direction = input.move_direction();
-        
+
         let move_direction = {
-            ( right   * input_direction[0] ) +
-            ( up      * input_direction[1] ) +
-            ( forward * input_direction[2] )
+            ( *camera.transform.right() * input_direction[0] ) +
+            ( *camera.transform.up() * input_direction[1] ) +
+            ( *camera.transform.forward() * input_direction[2] )
         }.normal();
 
         let move_speed = if input.speed_up { fast_camera_speed }
@@ -180,19 +205,19 @@ fn main() {
         camera.transform.translate( &translation );
 
         mesh_transform.rotate( &Vector3::new( 0.0, d2r(timer.delta_time() * 5.0), 0.0 ) );
+        mesh_transform.update_transform_matrix();
+        mesh_transform.update_normal_matrix();
 
-        normal_mat = Matrix4x4::transpose( mesh_transform.transform_mat().inverse().unwrap() ).as_matrix3x3();
-
+        // RENDER -------------------------------------------------------------------------------
+        
         opengl_fn::clear_screen();
 
-        mesh_shader.use_program();
+        model.material[transform_loc].set_matrix4( *mesh_transform.transform_matrix() );
+        model.material[view_loc].set_matrix4( camera.view() );
+        model.material[normal_loc].set_matrix3( *mesh_transform.normal_matrix() );
+        model.material[camera_pos_loc].set_vector3( *camera.transform.position() );
 
-        mesh_shader.set_matrix4( shader_view_loc, &camera.view() );
-        mesh_shader.set_vector3( shader_camerapos_loc, camera.transform.get_position() );
-        mesh_shader.set_matrix4( shader_transform_loc, mesh_transform.transform_mat() );
-        mesh_shader.set_matrix3( shader_normal_mat_loc, &normal_mat );
-
-        mesh.render();
+        model.render();
         
         window.gl_swap_window();
 
@@ -294,7 +319,7 @@ fn process_input( input:&mut Input, key_code:Option<Keycode>, is_down:bool ) {
     }
 }
 
-fn select_mesh() -> String {
+fn _select_mesh() -> String {
     println!("1 - cube");
     println!("2 - sphere");
     println!("3 - cone");

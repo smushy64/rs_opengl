@@ -7,7 +7,7 @@ use std::{
     path::{ Path, PathBuf },
 };
 
-pub fn load_image( path:PathBuf ) -> Result<image::DynamicImage, String> {
+pub fn load_image( path:&PathBuf ) -> Result<image::DynamicImage, String> {
     image::open( path )
-        .map_err( |e| format!("{}", e) )
+        .map_err( |e| format!("Load Image Error: {}", e) )
 }

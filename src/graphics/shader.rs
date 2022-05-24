@@ -3,30 +3,115 @@ use fmath::types::*;
 use crate::{
     c_string,
     opengl_fn,
-    texture::TexCoord,
+    Rc
 };
 
-#[derive(Clone)]
+use super::{
+    uniform::UniformInfo,
+    MaterialUniform,
+    Sampler
+};
+
 pub struct ShaderProgram {
-    handle: GLuint
+    handle: GLuint,
+    uniforms: Vec<UniformInfo>,
 }
 
 impl ShaderProgram {
 
-    pub fn get_uniform_location( &self, name:&str ) -> GLint {
+    pub fn from_shaders( shaders: &[Shader] ) -> Result<Rc<Self>, Error> {
         unsafe {
-            let c_name = c_string::c_string_from_str(name).unwrap();
-            let location =
-                gl::GetUniformLocation( self.handle() , c_name.as_ptr() as *const GLchar );
-            return location;
+            let handle:GLuint = gl::CreateProgram();
+
+            for shader in shaders {
+                gl::AttachShader( handle, shader.handle() );
+            }
+
+            gl::LinkProgram( handle );
+
+            let mut link_status:GLint = 1;
+            gl::GetProgramiv( handle, gl::LINK_STATUS, &mut link_status );
+
+            if FAILED == link_status {
+                return Err(
+                    Error::Linking( opengl_fn::gl_error_linking( handle ) )
+                )
+            }
+
+            for shader in shaders {
+                gl::DetachShader( handle, shader.handle() );
+            }
+
+            return Ok(
+                Rc::new( Self {
+                    handle,
+                    uniforms: Self::get_uniforms( handle )
+                } )
+            );
+
         }
     }
 
-    pub fn set_sampler( &self, loc:GLint, value:&TexCoord ) {
-        self.set_i32( loc, value.get_id() );
+    fn get_uniforms( handle:GLuint ) -> Vec<UniformInfo> {
+        unsafe {
+
+            let mut uniform_count = 0;
+            gl::GetProgramiv(
+                handle,
+                gl::ACTIVE_UNIFORMS,
+                &mut uniform_count
+            );
+            let mut uniforms:Vec<UniformInfo> = Vec::with_capacity( uniform_count as usize );
+
+            for i in 0..uniform_count {
+
+                let mut uniform_size:GLint  = 0;
+                let mut uniform_kind:GLenum = 0;
+                let uniform_name_buffer_len:GLint = 255;
+
+                let name = c_string::create_empty_c_string( ( uniform_name_buffer_len + 1 ) as usize );
+
+                gl::GetActiveUniform(
+                    handle, i as GLuint,
+                    uniform_name_buffer_len, core::ptr::null_mut(),
+                    &mut uniform_size, &mut uniform_kind,
+                    name.as_ptr() as *mut GLchar
+                );
+
+                uniforms.push(
+                    UniformInfo::new(
+                        c_string::to_string( name ),
+                        uniform_kind,
+                    )
+                );
+
+            }
+
+            return uniforms;
+
+        }
     }
 
-    pub fn set_sampler_by_name( &self, name:&str, value:&TexCoord ) {
+    pub fn generate_material_uniforms( &self ) -> Vec<MaterialUniform> {
+        UniformInfo::generate_material_uniforms( &self.uniforms )
+    }
+
+    pub fn get_uniform_location( &self, name:&str ) -> GLint {
+        let mut location = -1;
+        for ( idx, uniform ) in self.uniforms.iter().enumerate() {
+            if uniform.name() == name {
+                location = idx as GLint;
+                break;
+            }
+        }
+        location
+    }
+
+    pub fn set_sampler( &self, loc:GLint, value:&Sampler ) {
+        self.set_i32( loc, value.id() );
+    }
+
+    pub fn set_sampler_by_name( &self, name:&str, value:&Sampler ) {
         self.set_sampler( self.get_uniform_location( name ), value );
     }
 
@@ -117,46 +202,17 @@ impl ShaderProgram {
     }
 
     pub fn use_program(&self) {
-        unsafe { gl::UseProgram( self.handle() ); }
+        unsafe { gl::UseProgram( *self.handle() ); }
     }
 
-    pub fn handle(&self) -> GLuint {
-        self.handle
-    }
-
-    pub fn from_shaders( shaders: &[Shader] ) -> Result<Self, Error> {
-        unsafe {
-            let handle:GLuint = gl::CreateProgram();
-
-            for shader in shaders {
-                gl::AttachShader( handle, shader.handle() );
-            }
-
-            gl::LinkProgram( handle );
-
-            let mut link_status:GLint = 1;
-            gl::GetProgramiv( handle, gl::LINK_STATUS, &mut link_status );
-
-            if FAILED == link_status {
-                return Err(
-                    Error::Linking( opengl_fn::gl_error_linking( handle ) )
-                )
-            }
-
-            for shader in shaders {
-                gl::DetachShader( handle, shader.handle() );
-            }
-
-            return Ok( Self { handle } );
-
-        }
-    }
+    pub fn handle(&self)   -> &GLuint           { &self.handle }
+    pub fn uniforms(&self) -> &Vec<UniformInfo> { &self.uniforms }
 
 }
 
 impl Drop for ShaderProgram {
     fn drop( &mut self ) {
-        unsafe { gl::DeleteProgram( self.handle() ) }
+        unsafe { gl::DeleteProgram( *self.handle() ) }
     }
 }
 
