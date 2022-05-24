@@ -15,7 +15,7 @@ Crates in use:
 
 ## Progress Images
 
-### Stencil and Depth Buffer | [Demo](bin/releases/multiple_lights/)
+### Stencil and Depth Buffer | [Demo](bin/releases/stencil_depth/)
 
 ![Stencil and Depth Buffer](progress/stencil_depth.jpg)
 
