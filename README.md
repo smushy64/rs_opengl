@@ -9,6 +9,7 @@ Crates in use:
 - [SDL2](https://crates.io/crates/sdl2)
 - [image](https://crates.io/crates/image)
 - [fmath](https://github.com/smushy64/fmath)
+- [rs_wavefront_obj_parser](https://github.com/smushy64/rs_wavefront_obj_parser)
 
 Textures from the [Learn OpenGL github repo](https://github.com/JoeyDeVries/LearnOpenGL)
 
