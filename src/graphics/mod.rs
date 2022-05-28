@@ -34,17 +34,171 @@ pub fn set_clear_color( color:&fmath::types::color::RGB ) {
     unsafe { gl::ClearColor( rgb.0, rgb.1, rgb.2, 1.0 ); }
 }
 
-// TODO: Create clear screen mask abstraction
-pub fn clear_screen( mask:u32 ) {
-    unsafe { gl::Clear( gl::COLOR_BUFFER_BIT | mask ); }
-}
-
 pub fn update_viewport( dimensions:&fmath::types::Vector2 ) {
     unsafe {
         gl::Viewport(
             0 as GLint, 0 as GLint,
             dimensions[0] as GLsizei, dimensions[1] as GLsizei
         );
+    }
+}
+
+// TODO: Create clear screen mask abstraction
+pub fn clear_screen( mask:u32 ) {
+    unsafe { gl::Clear( gl::COLOR_BUFFER_BIT | mask ); }
+}
+
+// TODO: Finish enum definition!
+#[derive(Debug, Clone, Copy)]
+pub enum ScreenBuffers {
+    Color   = 0x4000,
+    Depth   = 0x100,
+    Stencil = 0x400,
+}
+
+#[derive(Debug, Clone)]
+pub struct Culling {
+    enabled: bool,
+    mode:    CullingMode,
+    order:   WindingOrder,
+}
+
+impl Culling {
+    pub fn initialize() -> Self {
+        let mode  = CullingMode::Back;
+        let order = WindingOrder::CounterClockwise;
+        Self {
+            enabled: true,
+            mode, order
+        }
+    }
+
+    pub fn initialize_disabled() -> Self {
+        let mode  = CullingMode::Back;
+        let order = WindingOrder::CounterClockwise;
+        Self {
+            enabled: false,
+            mode, order
+        }
+    }
+
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn update_gl( &self )   {
+        Self::gl_enable( self.enabled );
+        if self.enabled {
+            Self::gl_set_winding_order( self.order as GLenum );
+            Self::gl_set_culling_mode( self.mode as GLenum );
+        }
+    }
+    pub fn enable( &mut self )  { self.enabled = true;  }
+    pub fn disable( &mut self ) { self.enabled = false; }
+
+    pub fn winding_order(&self) -> WindingOrder { self.order }
+    pub fn set_winding_order( &mut self, order:WindingOrder ) { self.order = order; }
+
+    pub fn culling_mode(&self)  -> CullingMode  { self.mode }
+    pub fn set_culling_mode( &mut self, mode:CullingMode ) { self.mode = mode; }
+
+    fn gl_set_culling_mode( g:GLenum ) {
+        unsafe {
+            gl::CullFace( g );
+        }
+    }
+
+    fn gl_set_winding_order( g:GLenum ) {
+        unsafe {
+            gl::FrontFace( g );
+        }
+    }
+
+    fn gl_enable( b:bool ) {
+        unsafe {
+            if b { gl::Enable( gl::CULL_FACE ) }
+            else { gl::Disable( gl::CULL_FACE ) }
+        }
+    }
+}
+
+impl fmt::Display for Culling {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let enabled = if self.enabled { "Enabled" }
+        else { "Disabled" };
+        write!( f, "Culling {} | Winding Order: {} Mode: {}",
+            enabled, self.winding_order(), self.culling_mode()
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum WindingOrder {
+    Clockwise        = 0x900,
+    CounterClockwise = 0x901,
+}
+
+impl TryFrom<GLenum> for WindingOrder {
+    type Error = ();
+
+    fn try_from(value: GLenum) -> Result<Self, Self::Error> {
+        match value {
+            0x900 => Ok( Self::Clockwise        ),
+            _     => Ok( Self::CounterClockwise ),
+        }
+    }
+}
+
+impl WindingOrder {
+    pub fn as_glenum(&self) -> GLenum { *self as GLenum }
+    pub fn from_glenum( g:GLenum ) -> Self { g.try_into().unwrap() }
+
+    pub fn msg(&self) -> &str {
+        match self {
+            Self::Clockwise        => "Clockwise",
+            Self::CounterClockwise => "Counter-Clockwise",
+        }
+    }
+}
+
+impl fmt::Display for WindingOrder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f, "{}", self.msg() )
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum CullingMode {
+    Back         = 0x405,
+    Front        = 0x404,
+    FrontAndBack = 0x408,
+}
+
+impl TryFrom<GLenum> for CullingMode {
+    type Error = ();
+
+    fn try_from(value: GLenum) -> Result<Self, Self::Error> {
+        match value {
+            0x404 => Ok( Self::Front        ),
+            0x408 => Ok( Self::FrontAndBack ),
+            _     => Ok( Self::Back         ),
+        }
+    }
+}
+
+impl CullingMode {
+    pub fn as_glenum(&self) -> GLenum { *self as GLenum }
+    pub fn from_glenum( g:GLenum ) -> Self { g.try_into().unwrap() }
+
+    pub fn msg(&self) -> &str {
+        match self {
+            Self::Back         => "Back",
+            Self::Front        => "Front",
+            Self::FrontAndBack => "Front and Back",
+        }
+    }
+}
+
+impl fmt::Display for CullingMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f, "{}", self.msg() )
     }
 }
 

@@ -2,13 +2,14 @@
 use fmath::types::*;
 use gl::types::*;
 
-use super::Vertex;
+use super::{ Vertex, Culling };
 
 #[derive(Debug, Clone)]
 pub struct Mesh {
 
     pub vertices: Vec<Vertex>,
     pub indeces:  Vec<GLuint>,
+    pub culling: Culling,
 
     // opengl render data
     vao: GLuint,
@@ -21,8 +22,7 @@ pub struct Mesh {
 
 impl Mesh {
 
-    pub fn new( vertices: Vec<Vertex>, indeces: Vec<GLuint> ) -> Self {
-
+    pub fn new_with_culling( vertices: Vec<Vertex>, indeces: Vec<GLuint>, culling: Culling ) -> Self {
         const VERTEX_SIZE:GLint = 32;
         const U32_SIZE:GLint    =  4;
         const NORMAL_PTR_OFFSET:GLint = 12;
@@ -89,9 +89,14 @@ impl Mesh {
         Self {
             vertices,
             indeces,
+            culling,
             vao, vbo, ebo,
             index_count,
         }
+    }
+
+    pub fn new( vertices: Vec<Vertex>, indeces: Vec<GLuint> ) -> Self {
+        Self::new_with_culling( vertices, indeces, Culling::initialize() )
     }
 
     pub fn bind_buffers(&self) {
@@ -104,6 +109,7 @@ impl Mesh {
 
     pub fn render(&self) {
         unsafe {
+            self.culling.update_gl();
             self.bind_buffers();
             gl::DrawElements(
                 gl::TRIANGLES,
@@ -121,6 +127,7 @@ impl Mesh {
         Self {
             vertices: Vec::new(),
             indeces:  Vec::new(),
+            culling: Culling::initialize(),
             vao: 0, vbo: 0, ebo: 0,
             index_count: 0
         }
@@ -160,81 +167,58 @@ pub fn generate_plane() -> Mesh {
         2, 1, 3,
     ];
 
-    Mesh::new( vertices, indeces )
+    Mesh::new_with_culling( vertices, indeces, Culling::initialize_disabled() )
 
-}
-
-#[allow(dead_code)]
-pub fn generate_cone() -> Mesh {
-
-    let vertices:Vec<Vertex> = vec![
-        Vertex{ position:Vector3::new( 0.0, 0.0,0.0), normal:Vector3::new( 0.00, 0.00,-1.0), uv:Vector2::new(0.0, 0.0) },
-        Vertex{ position:Vector3::new( 0.0, 1.0,1.0), normal:Vector3::new( 0.00, 1.00, 0.0), uv:Vector2::new(0.0, 0.0) },
-        Vertex{ position:Vector3::new( 0.0,-1.0,1.0), normal:Vector3::new( 0.00,-1.00, 0.0), uv:Vector2::new(0.0, 0.0) },
-        Vertex{ position:Vector3::new(-0.8, 0.5,1.0), normal:Vector3::new(-0.77, 0.77, 0.0), uv:Vector2::new(0.0, 0.0) },
-        Vertex{ position:Vector3::new(-0.8,-0.5,1.0), normal:Vector3::new(-0.77,-0.77, 0.0), uv:Vector2::new(0.0, 0.0) },
-        Vertex{ position:Vector3::new( 0.8, 0.5,1.0), normal:Vector3::new( 0.77, 0.77, 0.0), uv:Vector2::new(0.0, 0.0) },
-        Vertex{ position:Vector3::new( 0.8,-0.5,1.0), normal:Vector3::new( 0.77,-0.77, 0.0), uv:Vector2::new(0.0, 0.0) },
-    ];
-
-    let indeces:Vec<u32> = vec![
-        // top right
-        0, 1, 5,
-        // mid right
-        0, 5, 6,
-        // bottom right
-        0, 6, 2,
-        // bottom left
-        0, 4, 2,
-        // mid left
-        0, 3, 4,
-        // top left
-        0, 1, 3,
-        // cap right top
-        5, 1, 6,
-        // cap right bottom
-        6, 1, 2,
-        // cap left bottom
-        2, 3, 4,
-        // cap left top
-        2, 1, 3,
-    ];
-
-    Mesh::new( vertices, indeces )
 }
 
 #[allow(dead_code)]
 pub fn generate_cube() -> Mesh {
     let vertices:Vec<Vertex> = vec![
         // front
+        // top left
         Vertex{ position:Vector3::new(-0.5, 0.5,0.5), normal:Vector3::new(0.0,0.0,1.0), uv:Vector2::new(0.0,1.0)},
+        // top right
         Vertex{ position:Vector3::new( 0.5, 0.5,0.5), normal:Vector3::new(0.0,0.0,1.0), uv:Vector2::new(1.0,1.0)},
+        // bottom left
         Vertex{ position:Vector3::new(-0.5,-0.5,0.5), normal:Vector3::new(0.0,0.0,1.0), uv:Vector2::new(0.0,0.0)},
+        // bottom right
         Vertex{ position:Vector3::new( 0.5,-0.5,0.5), normal:Vector3::new(0.0,0.0,1.0), uv:Vector2::new(1.0,0.0)},
 
         // back
-        Vertex{ position:Vector3::new(-0.5, 0.5,-0.5), normal:Vector3::new(0.0,0.0,-1.0), uv:Vector2::new(0.0,1.0)},
+        // top left
         Vertex{ position:Vector3::new( 0.5, 0.5,-0.5), normal:Vector3::new(0.0,0.0,-1.0), uv:Vector2::new(1.0,1.0)},
-        Vertex{ position:Vector3::new(-0.5,-0.5,-0.5), normal:Vector3::new(0.0,0.0,-1.0), uv:Vector2::new(0.0,0.0)},
+        // top right
+        Vertex{ position:Vector3::new(-0.5, 0.5,-0.5), normal:Vector3::new(0.0,0.0,-1.0), uv:Vector2::new(0.0,1.0)},
+        // bottom left
         Vertex{ position:Vector3::new( 0.5,-0.5,-0.5), normal:Vector3::new(0.0,0.0,-1.0), uv:Vector2::new(1.0,0.0)},
+        // bottom right
+        Vertex{ position:Vector3::new(-0.5,-0.5,-0.5), normal:Vector3::new(0.0,0.0,-1.0), uv:Vector2::new(0.0,0.0)},
 
         // left
+        // top left
         Vertex{ position:Vector3::new(-0.5, 0.5,-0.5), normal:Vector3::new(-1.0,0.0,0.0), uv:Vector2::new(0.0,1.0)},
+        // top right
         Vertex{ position:Vector3::new(-0.5, 0.5, 0.5), normal:Vector3::new(-1.0,0.0,0.0), uv:Vector2::new(1.0,1.0)},
+        // bottom left
         Vertex{ position:Vector3::new(-0.5,-0.5,-0.5), normal:Vector3::new(-1.0,0.0,0.0), uv:Vector2::new(0.0,0.0)},
+        // bottom right
         Vertex{ position:Vector3::new(-0.5,-0.5, 0.5), normal:Vector3::new(-1.0,0.0,0.0), uv:Vector2::new(1.0,0.0)},
 
         // right
-        Vertex{ position:Vector3::new(0.5,  0.5, -0.5), normal:Vector3::new(1.0,0.0,0.0), uv:Vector2::new(0.0,1.0)},
+        // top left
         Vertex{ position:Vector3::new(0.5,  0.5,  0.5), normal:Vector3::new(1.0,0.0,0.0), uv:Vector2::new(1.0,1.0)},
-        Vertex{ position:Vector3::new(0.5, -0.5, -0.5), normal:Vector3::new(1.0,0.0,0.0), uv:Vector2::new(0.0,0.0)},
+        // top right
+        Vertex{ position:Vector3::new(0.5,  0.5, -0.5), normal:Vector3::new(1.0,0.0,0.0), uv:Vector2::new(0.0,1.0)},
+        // bottom left
         Vertex{ position:Vector3::new(0.5, -0.5,  0.5), normal:Vector3::new(1.0,0.0,0.0), uv:Vector2::new(1.0,0.0)},
+        // bottom right
+        Vertex{ position:Vector3::new(0.5, -0.5, -0.5), normal:Vector3::new(1.0,0.0,0.0), uv:Vector2::new(0.0,0.0)},
 
         // top
-        Vertex{ position:Vector3::new(-0.5,  0.5,  0.5), normal:Vector3::new(0.0,1.0,0.0), uv:Vector2::new(0.0,1.0)},
         Vertex{ position:Vector3::new( 0.5,  0.5,  0.5), normal:Vector3::new(0.0,1.0,0.0), uv:Vector2::new(1.0,1.0)},
-        Vertex{ position:Vector3::new(-0.5,  0.5, -0.5), normal:Vector3::new(0.0,1.0,0.0), uv:Vector2::new(0.0,0.0)},
+        Vertex{ position:Vector3::new(-0.5,  0.5,  0.5), normal:Vector3::new(0.0,1.0,0.0), uv:Vector2::new(0.0,1.0)},
         Vertex{ position:Vector3::new( 0.5,  0.5, -0.5), normal:Vector3::new(0.0,1.0,0.0), uv:Vector2::new(1.0,0.0)},
+        Vertex{ position:Vector3::new(-0.5,  0.5, -0.5), normal:Vector3::new(0.0,1.0,0.0), uv:Vector2::new(0.0,0.0)},
 
         // bottom
         Vertex{ position:Vector3::new(-0.5, -0.5,  0.5), normal:Vector3::new(0.0,-1.0,0.0), uv:Vector2::new(0.0,1.0)},
@@ -244,23 +228,23 @@ pub fn generate_cube() -> Mesh {
     ];
 
     let indeces:Vec<u32> = vec![
-        0, 1, 2,
-        1, 3, 2,
+        0, 2, 1,
+        1, 2, 3,
 
-        4, 5, 6,
-        5, 7, 6,
+        4, 6, 5,
+        5, 6, 7,
 
-        8,  9, 10,
-        9, 11, 10,
+        8, 10,  9,
+        9, 10, 11,
 
-        12, 13, 14,
-        13, 15, 14,
+        12, 14, 13,
+        13, 14, 15,
 
-        16, 17, 18,
-        17, 19, 18,
+        16, 18, 17,
+        17, 18, 19,
 
-        20, 21, 22,
-        21, 23, 22,
+        20, 22, 21,
+        21, 22, 23,
     ];
 
     Mesh::new( vertices, indeces )

@@ -83,7 +83,7 @@ fn main() {
     let mouse_sensitivity= 10.0;
 
     let mut camera = Camera::new(
-        Vector3::new( 0.0, 0.6, 0.0 ),
+        Vector3::new( 0.0, 0.2, 0.0 ),
         Vector3::new( 0.0, -90.0f32.to_radians(), 0.0 ),
         camera::Projection::perspective_default(),
         camera::ScreenResolution::new( program_info.dimensions ),
@@ -95,65 +95,47 @@ fn main() {
     let camera_up = Vector3::new_up();
     
     // NOTE: Mesh is loaded here! Models generated here!
-    let suzanne_meshes = resources::load_meshes( "suzanne.obj" ).unwrap();
+    let cube_mesh = resources::load_meshes("suzanne.obj").unwrap();
     let floor_meshes = resources::load_meshes( "cube.obj" ).unwrap();
-    let window_mesh = graphics::mesh::generate_plane();
-    let window_transforms = [ Transform::new(
-        Vector3::new( 0.4, 0.6, -0.8 ),
-            Vector3::new_zero(),
-            Vector3::new_one()
-        ), Transform::new(
-            Vector3::new( 0.0, 0.6, -1.5 ),
-            Vector3::new_zero(),
-            Vector3::new_one()
-        ),
-    ];
 
     // NOTE: Textures loaded here!
-    let suzanne_diffuse_texture  = graphics::Texture::new_color_texture(
-        color::RGB::new_rgb( 245, 200, 0 ) );
-    let suzanne_specular_texture = graphics::Texture::new_color_texture(
+    let cube_diffuse_texture  = graphics::Texture::new_color_texture(
+        color::RGB::new_rgb( 180, 50, 232 ) );
+    let cube_specular_texture = graphics::Texture::new_color_texture(
         color::RGB::new_white() * 0.5
     );
-
-    let mut window_texture_options = texture::TextureOptions::default();
-    window_texture_options.set_wrapping( texture::TextureWrapping::ClampToEdge );
-
-    let window_texture = resources::load_texture(
-        "window.png", window_texture_options
-    ).unwrap();
 
     let floor_texture = resources::load_texture(
         "brickwall.jpg", texture::TextureOptions::default()
     ).unwrap();
 
     // NOTE: Shaders loaded here!
-    let suzanne_shader = resources::load_shader_program("model").unwrap();
+    let cube_shader = resources::load_shader_program("model").unwrap();
     let floor_shader = resources::load_shader_program("fog").unwrap();
-    let transparency_shader = resources::load_shader_program("transparency").unwrap();
 
-    let mut suzanne_transform = Transform::new_with_position( Vector3::new_back() * 4.0 );
-    let mut suzanne_material = Material::new( suzanne_shader.clone() );
+    let mut cube_transform = Transform::new_with_position( Vector3::new_back() * 4.0 );
+    // cube_transform.scale( &( Vector3::new_one() * 1.2 ) );
+    let mut cube_material = Material::new( cube_shader.clone() );
 
-    let suzanne_transform_loc = suzanne_material.get_uniform_location("transform");
-    let suzanne_normal_loc    = suzanne_material.get_uniform_location("normal_mat");
-    let suzanne_view_loc      = suzanne_material.get_uniform_location("view");
-    let suzanne_campos_loc    = suzanne_material.get_uniform_location("camera_position");
-    let suzanne_diffuse_loc   = suzanne_material.get_uniform_location("diffuse_texture");
-    let suzanne_specular_loc  = suzanne_material.get_uniform_location("specular_texture");
+    let cube_trans_loc    = cube_material.get_uniform_location("transform");
+    let cube_normal_loc   = cube_material.get_uniform_location("normal_mat");
+    let cube_view_loc     = cube_material.get_uniform_location("view");
+    let cube_campos_loc   = cube_material.get_uniform_location("camera_position");
+    let cube_diffuse_loc  = cube_material.get_uniform_location("diffuse_texture");
+    let cube_specular_loc = cube_material.get_uniform_location("specular_texture");
 
-    suzanne_material[suzanne_transform_loc].set_matrix4x4( *suzanne_transform.current_transform_matrix() );
-    suzanne_material[suzanne_normal_loc].set_matrix3x3( *suzanne_transform.current_normal_matrix() );
-    suzanne_material[suzanne_view_loc].set_matrix4x4( camera_view );
-    suzanne_material[suzanne_campos_loc].set_vector3( *camera.position() );
-    suzanne_material[suzanne_diffuse_loc].set_sampler2d( ( suzanne_diffuse_texture.clone(), Sampler::new( 0 ) ) );
-    suzanne_material[suzanne_specular_loc].set_sampler2d( ( suzanne_specular_texture.clone(), Sampler::new( 1 ) ) );
-    suzanne_material["projection"].set_matrix4x4( camera_projection );
-    suzanne_material["directional_light.direction"].set_vector3( Vector3::new_up() + Vector3::new_forward() );
-    suzanne_material["directional_light.color"].set_rgb( color::RGB::new_white() * 0.8 );
-    suzanne_material["directional_light.ambient_color"].set_rgb(
-        color::RGB::new_rgb( 255, 185, 0 ) * 0.12 );
-    suzanne_material["glossiness"].set_f32( 3.0 );
+    cube_material[cube_trans_loc].set_matrix4x4( *cube_transform.current_transform_matrix() );
+    cube_material[cube_normal_loc].set_matrix3x3( *cube_transform.current_normal_matrix() );
+    cube_material[cube_view_loc].set_matrix4x4( camera_view );
+    cube_material[cube_campos_loc].set_vector3( *camera.position() );
+    cube_material[cube_diffuse_loc].set_sampler2d( ( cube_diffuse_texture.clone(), Sampler::new( 0 ) ) );
+    cube_material[cube_specular_loc].set_sampler2d( ( cube_specular_texture.clone(), Sampler::new( 1 ) ) );
+    cube_material["projection"].set_matrix4x4( camera_projection );
+    cube_material["directional_light.direction"].set_vector3( Vector3::new_up() + Vector3::new_forward() );
+    cube_material["directional_light.color"].set_rgb( color::RGB::new_white() * 0.8 );
+    cube_material["directional_light.ambient_color"].set_rgb(
+        color::RGB::new_rgb( 255, 185, 0 ) * 0.22 );
+    cube_material["glossiness"].set_f32( 3.0 );
 
     let mut floor_material = Material::new( floor_shader.clone() );
 
@@ -170,18 +152,6 @@ fn main() {
     floor_material[floor_diffuse_loc].set_sampler2d( ( floor_texture.clone(), Sampler::new( 0 ) ) );
     floor_material["fog_color"].set_rgb( clear_color );
 
-    let mut window_material = Material::new( transparency_shader.clone() );
-
-    let window_transform_loc = window_material.get_uniform_location("transform");
-    let window_view_loc = window_material.get_uniform_location("view");
-    let window_texture_loc = window_material.get_uniform_location("diffuse");
-
-    window_material["projection"].set_matrix4x4( camera_projection );
-    window_material[window_texture_loc].set_sampler2d( ( window_texture.clone(), Sampler::new( 0 ) ) );
-
-    use graphics::BlendFactor;
-    let mut _blend = Box::new( graphics::Blend::initialize() );
-    _blend.set_blend_factor( BlendFactor::SrcAlpha, BlendFactor::OneMinusSrcAlpha );
     let mut _depth_test = graphics::DepthTest::initialize();
     loop {
 
@@ -241,13 +211,6 @@ fn main() {
             else { slow_camera_speed };
         let translation = move_direction * move_speed * timer.delta_time();
 
-        suzanne_transform.rotate( &Vector3::new( 0.0, timer.delta_time() * 2.0, 0.0 ) );
-        *suzanne_transform.position_mut() = Vector3::new(
-            suzanne_transform.position()[0],
-            (timer.time().sin() + 1.2) * 0.5,
-            suzanne_transform.position()[2]
-        );
-
         camera.translate( &translation );
         camera_view = camera.new_view( camera_forward );
 
@@ -259,32 +222,12 @@ fn main() {
             floor_material.use_material();
             floor_meshes[0].render();
 
-            suzanne_material[suzanne_transform_loc].set_matrix4x4( *suzanne_transform.current_transform_matrix() );
-            suzanne_material[suzanne_normal_loc].set_matrix3x3( *suzanne_transform.current_normal_matrix() );
-            suzanne_material[suzanne_view_loc].set_matrix4x4( camera_view );
-            suzanne_material[suzanne_campos_loc].set_vector3( *camera.position() );
-            suzanne_material.use_material();
-            suzanne_meshes[0].render();
-
-            window_material.use_material();
-            window_material[window_view_loc].set_matrix4x4( camera_view );
-            
-            let mut sorted = window_transforms.clone();
-            sorted.sort_by(
-                | a, b | {
-                    let dist_a =
-                        ( *camera.position() - *a.position() ).sqr_magnitude();
-                    let dist_b =
-                        ( *camera.position() - *b.position() ).sqr_magnitude();
-                    dist_a.partial_cmp( &dist_b ).unwrap()
-                }
-            );
-
-            for transform in sorted.iter().rev() {
-                window_material[window_transform_loc].set_matrix4x4( *transform.transform_matrix() );
-                window_material.send_uniforms_to_gl();
-                window_mesh.render();
-            }
+            cube_material[cube_trans_loc].set_matrix4x4( *cube_transform.current_transform_matrix() );
+            cube_material[cube_normal_loc].set_matrix3x3( *cube_transform.current_normal_matrix() );
+            cube_material[cube_view_loc].set_matrix4x4( camera_view );
+            cube_material[cube_campos_loc].set_vector3( *camera.position() );
+            cube_material.use_material();
+            cube_mesh[0].render();
 
         } window.gl_swap_window();
 
