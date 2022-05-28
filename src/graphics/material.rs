@@ -1,110 +1,120 @@
-use crate::Rc;
-use super::{
-    ShaderProgram,
-    MaterialUniform,
-};
 use gl::types::*;
+use crate::{ Rc, debugging::Error };
+use super::{ ShaderProgram, Uniform };
+use core::{ fmt, ops::{ Index, IndexMut } };
 
-use core::{
-    ops::{
-        Index, IndexMut
-    }, fmt
-};
-
-/// Uniforms indexable with usize or its name as &str
-/// 
-/// Indexing with &str is slow!
-#[allow(dead_code)]
 pub struct Material {
-    name:       String,
-    shader_ref: Rc<ShaderProgram>,
-    uniforms:   Vec<MaterialUniform>
+    shader: Rc<ShaderProgram>,
+    uniforms: ( Vec<Uniform>, Vec<bool> ),
 }
 
 impl Material {
 
-    pub fn new( name:&str, shader:Rc<ShaderProgram> ) -> Self {
-        let material_uniforms = shader.generate_material_uniforms();
-        Self {
-            name: String::from( name ),
-            shader_ref: shader,
-            uniforms: material_uniforms
+    pub fn new( shader:Rc<ShaderProgram> ) -> Self {
+        let uniforms = shader.generate_uniforms();
+        Self { shader, uniforms }
+    }
+
+    pub fn clone_from( m:&Self ) -> Self {
+        Self { shader: m.shader.clone(), uniforms: m.uniforms.clone() }
+    }
+
+    pub fn shader(&self)   -> &Rc<ShaderProgram> { &self.shader }
+    pub fn uniforms(&self) -> &Vec<Uniform>  { &self.uniforms.0 }
+
+    pub fn use_shader(&self) { self.shader.use_program() }
+    pub fn send_uniforms_to_gl(&mut self) {
+        for (idx, uniform) in self.uniforms.0.iter().enumerate() {
+            let dirty_flag = &mut self.uniforms.1[idx];
+            uniform.send_if_dirty( *dirty_flag );
+            *dirty_flag = false;
+        }
+    }
+    pub fn use_material(&mut self) { self.use_shader(); self.send_uniforms_to_gl(); }
+
+    pub fn get_uniform_location( &self, name:&str ) -> usize {
+        let result = self.shader.get_uniform_location(name);
+        if result < 0 { panic!( "Uniform \"{}\" not found!", name ) }
+        result as usize
+    }
+
+    pub fn get_uniform_by_name( &self, name:&str ) -> Result<&Uniform, Error> {
+        Uniform::find_uniform_by_name( &self.uniforms.0, &self.shader, name )
+    }
+
+    pub fn get_uniform_by_location( &self, location:GLint ) -> Result<&Uniform, Error> {
+        Uniform::find_uniform_by_location( &self.uniforms.0, location )
+    }
+
+    pub fn get_uniform_mut_by_name( &mut self, name:&str ) -> Result<&mut Uniform, Error> {
+        let loc = self.shader.get_uniform_location(name);
+        match self.uniforms.0.iter().position( |u| u.location() == loc ) {
+            Some(idx) => {
+                self.uniforms.1[idx] = true;
+                Ok( &mut self.uniforms.0[idx] )
+            },
+            None => Err( Error::UniformNotFound( format!("Uniform \"{}\" not found!", name) ) ),
         }
     }
 
-    pub fn clone( &self ) -> Self {
-        Self {
-            name: format!( "{} 0", self.get_name() ),
-            shader_ref: self.shader_ref.clone(),
-            uniforms: self.uniforms.clone()
-        }
-    }
-
-    pub fn get_name( &self )   -> &str           { &self.name }
-    pub fn get_shader( &self ) -> &ShaderProgram { &self.shader_ref }
-    pub fn get_uniform_location( &self, name:&str ) -> Option<usize> {
-        for (idx, uniform) in self.uniforms.iter().enumerate() {
-            if name == uniform.name() {
-                return Some( idx );
-            }
-        }
-        return None;
-    }
-
-    pub fn activate_shader( &self ) { self.shader_ref.use_program(); }
-
-    pub fn use_material(&self) {
-        self.activate_shader();
-        for ( idx, uniform ) in self.uniforms.iter().enumerate() {
-            uniform.send_value_to_shader( idx as GLint )
+    pub fn get_uniform_mut_by_location( &mut self, location:GLint ) -> Result<&mut Uniform, Error> {
+        match self.uniforms.0.iter().position( |u| u.location() == location ) {
+            Some(idx) => {
+                self.uniforms.1[idx] = true;
+                Ok( &mut self.uniforms.0[idx] )
+            },
+            None => Err( Error::UniformNotFound( format!("Uniform at location {} not found!", location) ) ),
         }
     }
 
 }
 
 impl Index<usize> for Material {
-    type Output = MaterialUniform;
+    type Output = Uniform;
 
-    fn index(&self, idx: usize) -> &MaterialUniform {
-        &self.uniforms[idx]
+    fn index( &self, index:usize ) -> &Uniform {
+        match self.get_uniform_by_location( index as GLint ) {
+            Ok(res) => res,
+            Err(e) => panic!( "{}", e ),
+        }
     }
 }
 
 impl Index<&str> for Material {
-    type Output = MaterialUniform;
+    type Output = Uniform;
 
-    fn index(&self, name: &str) -> &MaterialUniform {
-        match self.get_uniform_location( name ) {
-            Some(u) => &self[u],
-            None => panic!( "Uniform \"{}\" cannot be found!", name ),
+    fn index( &self, name:&str ) -> &Uniform {
+        match self.get_uniform_by_name( name ) {
+            Ok(res) => res,
+            Err(e) => panic!( "{}", e ),
         }
     }
 }
 
 impl IndexMut<usize> for Material {
-    fn index_mut(&mut self, idx: usize) -> &mut MaterialUniform {
-        &mut self.uniforms[idx]
+    fn index_mut( &mut self, index:usize ) -> &mut Uniform {
+        match self.get_uniform_mut_by_location( index as GLint ) {
+            Ok(res) => res,
+            Err(e) => panic!( "{}", e ),
+        }
     }
 }
 
 impl IndexMut<&str> for Material {
-    fn index_mut(&mut self, name: &str) -> &mut MaterialUniform {
-        match self.get_uniform_location( name ) {
-            Some(u) => &mut self[u],
-            None => panic!( "Uniform \"{}\" cannot be found!", name ),
+    fn index_mut( &mut self, name:&str ) -> &mut Uniform {
+        match self.get_uniform_mut_by_name( name ) {
+            Ok(res) => res,
+            Err(e) => panic!( "{}", e ),
         }
     }
 }
 
 impl fmt::Display for Material {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let msg = {
-            let mut buffer = String::new();
-            for (idx, uniform) in self.uniforms.iter().enumerate() {
-                buffer.push_str( &format!("     Uniform {:3} | {}\n", idx, uniform) )
-            }
-            buffer
-        };
-        write!( f, "Material \"{}\"\n{}", self.name, msg )
+        let mut uniform_info_buffer = String::new();
+        for uniform in self.uniforms.0.iter() {
+            uniform_info_buffer.push_str( &format!( "   {}\n", uniform ) )
+        }
+        write!( f, "Material | Shader: {} \n{}", self.shader().handle(), uniform_info_buffer )
     }
 }

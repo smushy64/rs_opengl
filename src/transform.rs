@@ -1,6 +1,7 @@
 use fmath::types::*;
 use core::fmt;
 
+#[derive(Debug, Clone)]
 pub struct Transform {
     position: Vector3,
     rotation: Vector3,
@@ -139,7 +140,7 @@ impl Transform {
     }
 
     fn calc_up_basis( forward:&Vector3, right:&Vector3 ) -> Vector3 {
-        Vector3::cross( forward, right ).normal()
+        Vector3::cross( forward, right )
     }
 
 }

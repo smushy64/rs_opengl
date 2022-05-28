@@ -1,13 +1,9 @@
 extern crate image;
-
 pub use image::DynamicImage;
+use std::path::PathBuf;
+use crate::debugging::Error;
 
-#[allow(unused_imports)]
-use std::{
-    path::{ Path, PathBuf },
-};
-
-pub fn load_image( path:&PathBuf ) -> Result<image::DynamicImage, String> {
+pub fn load_image( path:&PathBuf ) -> Result<image::DynamicImage, Error> {
     image::open( path )
-        .map_err( |e| format!("Load Image Error: {}", e) )
+        .map_err( |e| Error::ImageCrateLoad( format!("{}", e) ) )
 }

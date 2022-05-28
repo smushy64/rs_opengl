@@ -1,17 +1,11 @@
 use gl::types::*;
-use fmath::types::*;
-use crate::{ c_string, Rc };
 use core::fmt;
-
-use super::{
-    uniform::UniformInfo,
-    MaterialUniform,
-    Sampler
-};
+use crate::{ cstr::*, Rc, debugging::{ Error, log } };
+use super::uniform::{ UniformInfo, Uniform };
 
 pub struct ShaderProgram {
     handle: GLuint,
-    uniforms: Vec<UniformInfo>,
+    uniform_info: Vec<UniformInfo>,
 }
 
 impl ShaderProgram {
@@ -20,7 +14,7 @@ impl ShaderProgram {
         unsafe {
             let handle:GLuint = gl::CreateProgram();
 
-            for shader in shaders {
+            for shader in shaders.iter() {
                 gl::AttachShader( handle, shader.handle() );
             }
 
@@ -29,380 +23,281 @@ impl ShaderProgram {
             let mut link_status:GLint = 1;
             gl::GetProgramiv( handle, gl::LINK_STATUS, &mut link_status );
 
-            if FAILED == link_status {
+            if link_status == FAILED {
                 return Err( linking_error( handle ) );
             }
 
-            for shader in shaders {
+            log(
+                "Successfully linked shaders.",
+                "Shader Linker"
+            );
+
+            for shader in shaders.iter() {
                 gl::DetachShader( handle, shader.handle() );
             }
 
-            return Ok(
-                Rc::new( Self {
-                    handle,
-                    uniforms: Self::get_uniforms( handle )
-                } )
-            );
+            return Ok( Rc::new( Self { handle, uniform_info: Self::gen_uniform_info( handle ) } ) );
 
         }
     }
 
-    fn get_uniforms( handle:GLuint ) -> Vec<UniformInfo> {
+    fn gl_get_uniform_count( handle:GLuint ) -> usize {
         unsafe {
+            let mut count = 0;
+            gl::GetProgramiv( handle, gl::ACTIVE_UNIFORMS, &mut count );
+            if count < 0 { 0 }
+            else { count as usize }
+        }
+    }
 
-            let mut uniform_count = 0;
-            gl::GetProgramiv(
-                handle,
-                gl::ACTIVE_UNIFORMS,
-                &mut uniform_count
-            );
-            let mut uniforms:Vec<UniformInfo> = Vec::with_capacity( uniform_count as usize );
+    fn gl_get_uniform_location( handle:GLuint, name:&CStr ) -> GLint {
+        unsafe { gl::GetUniformLocation( handle, name.as_ptr() as *const GLchar ) }
+    }
 
-            for i in 0..uniform_count {
+    fn gen_uniform_info( handle:GLuint ) -> Vec<UniformInfo> {
+        unsafe {
+            let count = Self::gl_get_uniform_count( handle );
+            if count == 0 {
+                log(
+                    &format!( "Generated no uniforms for shader {}.", handle ),
+                    "Shader Program"
+                );
+                return Vec::new();
+            }
+            let mut result:Vec<UniformInfo> = Vec::with_capacity( count );
 
-                let mut uniform_size:GLint  = 0;
-                let mut uniform_kind:GLenum = 0;
-                let uniform_name_buffer_len:GLint = 255;
+            for idx in 0..count {
+                let mut data_size = 0;
+                let mut kind = 0;
+                let mut name_buffer_len = 0;
+                let buffer_size = 128;
 
-                let name = c_string::create_empty_c_string( ( uniform_name_buffer_len + 1 ) as usize );
+                let mut name_buffer = vec![0u8;buffer_size as usize];
 
                 gl::GetActiveUniform(
-                    handle, i as GLuint,
-                    uniform_name_buffer_len, core::ptr::null_mut(),
-                    &mut uniform_size, &mut uniform_kind,
-                    name.as_ptr() as *mut GLchar
+                    handle, idx as GLuint,
+                    buffer_size, &mut name_buffer_len,
+                    &mut data_size, &mut kind,
+                    name_buffer.as_ptr() as *mut GLchar
                 );
+                name_buffer.truncate( (name_buffer_len + 1) as usize );
+                let name = CString::from_vec_with_nul_unchecked( name_buffer );
+                let location = Self::gl_get_uniform_location(handle, &name);
 
-                uniforms.push(
-                    UniformInfo::new(
-                        c_string::to_string( name ),
-                        uniform_kind,
-                    )
-                );
+                if location == INVALID_LOCATION { continue; }
 
+                let uniform = UniformInfo::new( name, kind, location );
+
+                result.push( uniform );
             }
 
-            return uniforms;
+            result.shrink_to_fit();
 
-        }
-    }
-
-    pub fn generate_material_uniforms( &self ) -> Vec<MaterialUniform> {
-        UniformInfo::generate_material_uniforms( &self.uniforms )
-    }
-
-    pub fn get_uniform_location( &self, name:&str ) -> GLint {
-        let mut location = -1;
-        for ( idx, uniform ) in self.uniforms.iter().enumerate() {
-            if uniform.name() == name {
-                location = idx as GLint;
-                break;
-            }
-        }
-        location
-    }
-
-    pub fn set_sampler( &self, loc:GLint, value:&Sampler ) {
-        self.set_i32( loc, value.id() );
-    }
-
-    pub fn set_sampler_by_name( &self, name:&str, value:&Sampler ) {
-        self.set_sampler( self.get_uniform_location( name ), value );
-    }
-
-    pub fn set_u32( &self, loc:GLint, value:&u32 ) {
-        unsafe {
-            gl::Uniform1ui( loc, *value );
-        }
-    }
-
-    pub fn set_u32_by_name( &self, name:&str, value:&u32 ) {
-        self.set_u32( self.get_uniform_location( name ), value )
-    }
-
-    pub fn set_i32( &self, loc:GLint, value:&i32 ) {
-        unsafe {
-            gl::Uniform1i( loc, *value );
-        }
-    }
-
-    pub fn set_i32_by_name( &self, name:&str, value:&i32 ) {
-        self.set_i32( self.get_uniform_location( name ), value )
-    }
-
-    pub fn set_f32( &self, loc:GLint, value:&f32 ) {
-        unsafe {
-            gl::Uniform1f( loc, *value );
-        }
-    }
-
-    pub fn set_f32_by_name( &self, name:&str, value:&f32 ) {
-        self.set_f32( self.get_uniform_location(name), value );
-    }
-
-    pub fn set_matrix4( &self, loc:GLint, value:&Matrix4x4 ) {
-        unsafe {
-            gl::UniformMatrix4fv(
-                loc, 1, 
-                gl::FALSE, value.as_array().as_ptr()
+            log(
+                &format!( "Generated {} uniforms for shader {}.", result.len(), handle ),
+                "Shader Program"
             );
+
+            result
         }
     }
 
-    pub fn set_matrix4_by_name( &self, name:&str, value:&Matrix4x4 ) {
-        self.set_matrix4( self.get_uniform_location(name), value );
+    pub fn use_program(&self) { unsafe { gl::UseProgram( self.handle() ); } }
+
+    pub fn generate_uniforms(&self) -> ( Vec<Uniform>, Vec<bool> ) {
+        let uniforms = UniformInfo::generate_values(&self.uniform_info);
+        let dirty = vec![true;uniforms.len()];
+        ( uniforms, dirty )
     }
 
-    pub fn set_matrix3( &self, loc:GLint, value:&Matrix3x3 ) {
-        unsafe {
-            gl::UniformMatrix3fv(
-                loc, 1, 
-                gl::FALSE, value.as_array().as_ptr()
-            );
+    pub fn handle(&self) -> GLuint { self.handle }
+
+    pub fn uniform_count(&self) -> usize { self.uniform_info.len() }
+
+    pub fn get_uniform_location(&self, name:&str) -> GLint {
+        let cname = CString::new( name ).unwrap();
+        let result = Self::gl_get_uniform_location( self.handle(), &cname );
+        #[cfg(debug_assertions)]
+        if result == INVALID_LOCATION {
+            log(
+                &format!( "Uniform \"{}\" not found!", name ),
+                &format!( "Shader {} get_uniform_location()", self.handle() )
+            )
         }
-    }
 
-    pub fn set_matrix3_by_name( &self, name:&str, value:&Matrix3x3 ) {
-        self.set_matrix3( self.get_uniform_location(name), value );
+        result
     }
-
-    pub fn set_vector3( &self, loc:GLint, value:&Vector3 ) {
-        unsafe {
-            gl::Uniform3fv( loc, 1, value.as_array().as_ptr() );
-        }
-    }
-
-    pub fn set_vector3_by_name( &self, name:&str, value:&Vector3 ) {
-        self.set_vector3( self.get_uniform_location(name), value );
-    }
-
-    pub fn set_vector4( &self, loc:GLint, value:&Vector4 ) {
-        unsafe {
-            gl::Uniform4fv( loc, 1, value.as_array().as_ptr() );
-        }
-    }
-
-    pub fn set_vector4_by_name( &self, name:&str, value:&Vector4 ) {
-        self.set_vector4( self.get_uniform_location(name), value );
-    }
-
-    pub fn set_rgb( &self, loc:GLint, value:&color::RGB ) {
-        unsafe {
-            gl::Uniform3fv( loc, 1, value.as_array_rgb_f32().as_ptr() );
-        }
-    }
-
-    pub fn set_rgb_by_name( &self, name:&str, value:&color::RGB ) {
-        self.set_rgb( self.get_uniform_location(name), value );
-    }
-
-    pub fn use_program(&self) {
-        unsafe { gl::UseProgram( *self.handle() ); }
-    }
-
-    pub fn handle(&self)   -> &GLuint           { &self.handle }
-    pub fn uniforms(&self) -> &Vec<UniformInfo> { &self.uniforms }
 
 }
 
 impl Drop for ShaderProgram {
     fn drop( &mut self ) {
-        unsafe { gl::DeleteProgram( *self.handle() ) }
+        unsafe { gl::DeleteProgram( self.handle() ) }
     }
 }
 
-pub struct Shader {
-    handle: GLuint,
+impl fmt::Display for ShaderProgram {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut buffer = String::new();
+        for uniform in self.uniform_info.iter() {
+            buffer.push_str( &format!( "   {}\n", uniform ) )
+        }
+        write!( f, "Shader {}\n{}", self.handle(), buffer )
+    }
 }
+
+pub struct Shader { handle:GLuint }
 
 impl Shader {
 
-    pub fn handle(&self) -> GLuint {
-        self.handle
-    }
+    pub fn handle(&self) -> GLuint { self.handle }
 
-    pub fn vert_from_source( src: &c_string::CStr ) -> Result<Self, Error> {
+    pub fn vert_from_source( src:&CStr ) -> Result<Self, Error> {
         Self::from_source(src, ShaderKind::Vertex)
     }
 
-    pub fn frag_from_source( src: &c_string::CStr ) -> Result<Self, Error> {
+    pub fn frag_from_source( src:&CStr ) -> Result<Self, Error> {
         Self::from_source(src, ShaderKind::Fragment)
     }
 
-    fn from_source( src: &c_string::CStr, kind:ShaderKind ) -> Result<Self, Error> {
-
-        let handle:GLuint = Self::create_shader( kind );
+    pub fn from_source( src:&CStr, kind:ShaderKind ) -> Result<Self, Error> {
         unsafe {
+            let handle:GLuint = gl::CreateShader( kind as GLenum );
             gl::ShaderSource(
                 handle, 1,
                 &src.as_ptr(), core::ptr::null()
             );
             gl::CompileShader( handle );
-        }
-
-        let mut compile_status:GLint = 1;
-        unsafe {
+            
+            let mut compile_status:GLint = 1;
             gl::GetShaderiv( handle, gl::COMPILE_STATUS, &mut compile_status );
-        }
 
-        if FAILED == compile_status {
-            return Err( compilation_error( handle ) );
-        }
-
-        return Ok( Self{ handle } );
-
-    }
-
-    fn create_shader( kind:ShaderKind ) -> GLuint {
-        match kind {
-            ShaderKind::Vertex   => unsafe { gl::CreateShader( gl::VERTEX_SHADER ) },
-            ShaderKind::Fragment => unsafe { gl::CreateShader( gl::FRAGMENT_SHADER ) },
+            if compile_status == FAILED { return Err( compilation_error( handle ) ); }
+            else {
+                log(
+                    format!("Successfully compiled {} shader.", kind ).as_str(),
+                    "Shader Compiler"
+                );
+                return Ok( Self{ handle } );
+            }
         }
     }
 
 }
 
 impl Drop for Shader {
-
     fn drop( &mut self ) {
-        unsafe {
-            gl::DeleteShader( self.handle() );
-        }
+        unsafe { gl::DeleteShader( self.handle() ) }
     }
-
 }
 
-enum ShaderKind {
-    Vertex, Fragment
+/// I dont want my fn to accept just any GLenum
+#[derive(Clone, Copy)]
+pub enum ShaderKind {
+    Vertex   = 0x8B31,
+    Fragment = 0x8B30,
+}
+
+impl fmt::Display for ShaderKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ShaderKind::Vertex   => write!( f, "Vertex" ),
+            ShaderKind::Fragment => write!( f, "Fragment" ),
+        }
+    }
 }
 
 const FAILED:GLint = 0;
 
-#[derive(Debug)]
-pub enum Error {
-    Linking(String),
-    Compilation(String),
-    Parse(String),
-}
-
-impl Error {
-    pub fn msg(&self) -> String {
-        match self {
-            Error::Linking( s )     => s.clone(),
-            Error::Compilation( s ) => s.clone(),
-            Error::Parse( s )       => s.clone(),
+pub fn compilation_error( shader_handle:GLuint ) -> Error {
+    unsafe {
+        let mut len = 0;
+        gl::GetShaderiv( shader_handle, gl::INFO_LOG_LENGTH, &mut len );
+        let message_buffer = CString::whitespace_buffer( len as usize );
+        gl::GetShaderInfoLog(
+            shader_handle, len,
+            core::ptr::null_mut(),
+            message_buffer.as_ptr() as *mut GLchar
+        );
+        match message_buffer.to_str() {
+            Ok( message ) => Error::ShaderCompiler( message.replace("\n", "").to_owned() ),
+            Err( e ) => Error::UTF8( format!( "{}", e ) ),
         }
     }
 }
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.msg())
-    }
-}
-
-pub fn compilation_error( id:GLuint ) -> Error {
+pub fn linking_error( shader_handle:GLuint ) -> Error {
     unsafe {
         let mut len:GLint = 0;
-        gl::GetShaderiv( id, gl::INFO_LOG_LENGTH, &mut len );
-        let message = c_string::create_empty_c_string( len as usize );
-        gl::GetShaderInfoLog(
-            id, len,
-            core::ptr::null_mut(),
-            message.as_ptr() as *mut GLchar
-        );
-        return Error::Compilation(
-            format!(
-                "Shader Compilation Error: {}",
-                message.to_string_lossy().into_owned()
-            )
-        );
-    }
-}
-
-pub fn linking_error( id:GLuint ) -> Error {
-    unsafe {
-        let mut len:GLint = 0;
-        gl::GetProgramiv( id, gl::INFO_LOG_LENGTH, &mut len );
-        let message = c_string::create_empty_c_string( len as usize );
+        gl::GetProgramiv( shader_handle, gl::INFO_LOG_LENGTH, &mut len );
+        let message_buffer = CString::whitespace_buffer( len as usize );
         gl::GetProgramInfoLog(
-            id, len,
+            shader_handle, len,
             core::ptr::null_mut(),
-            message.as_ptr() as *mut GLchar
+            message_buffer.as_ptr() as *mut GLchar
         );
-        return Error::Linking(
-            format!(
-                "Shader Linking Error: {}",
-                message.to_string_lossy().into_owned()
-            )
-        );
+        match message_buffer.to_str() {
+            Ok( message ) => Error::ShaderCompiler( message.replace("\n", "").to_owned() ),
+            Err( e ) => Error::UTF8( format!( "{}", e ) ),
+        }
     }
 }
 
-pub fn shader_parser( shader_program:String ) -> Result<[Shader;2], Error> {
+pub fn shader_parser( src:&str ) -> Result<[Shader;2], Error> {
 
     // PPD - Pre-processor directive
     const PPD_VERTEX:&str   = "#vertex";
     const PPD_FRAGMENT:&str = "#fragment";
 
     // split into lines
-    let parts:Vec<&str> = shader_program.split('\n').collect();
+    let lines:Vec<&str> = src.split('\n').collect();
 
-    let mut vert = String::new();
-    let mut frag = String::new();
+    let mut vert_buffer:Vec<&str> = Vec::new();
+    let mut frag_buffer:Vec<&str> = Vec::new();
 
     let mut shader_kind = ParseKind::None;
 
-    for part in parts.iter() {
+    for line in lines.iter() {
+        // skip empty
+        if line.is_empty() { continue; }
 
-        if part.contains( PPD_VERTEX ) {
+        if line.contains( PPD_VERTEX ) {
             shader_kind = ParseKind::Vertex;
             continue;
-        } else if part.contains( PPD_FRAGMENT ) {
+        } else if line.contains( PPD_FRAGMENT ) {
             shader_kind = ParseKind::Fragment;
             continue;
         }
 
         match shader_kind {
             ParseKind::Vertex => {
-                vert.push_str(part);
-                vert.push('\n');
+                vert_buffer.push( line );
             },
             ParseKind::Fragment => {
-                frag.push_str(part);
-                frag.push('\n');
+                frag_buffer.push( line );
             },
-            ParseKind::None => continue,
+            _ => continue,
         }
-
     }
 
-    if vert.is_empty() || frag.is_empty() {
-        return Err(
-            Error::Parse(format!("Shader Parse Error: Shader is not formatted properly!"))
-        );
+    if vert_buffer.is_empty() || frag_buffer.is_empty() {
+        return Err( Error::ShaderParse( "Shader is not formatted properly!".to_owned() ) );
     }
 
-    Ok(
-        [
-            Shader::vert_from_source(
-                &c_string::CString::new( vert.as_str() )
-                .map_err(|_|
-                    Error::Parse(
-                        format!("Shader Parse Error: File contains null character!")
-                    )
-                )?
-            )?,
-            Shader::frag_from_source(
-                &c_string::CString::new( frag.as_str() )
-                .map_err(|_|
-                    Error::Parse(
-                        format!("Shader Parse Error: File contains null character!")
-                    )
-                )?
-            )?,
-        ]
-    )
+    log(
+        "Successfully parsed Vertex and Fragment shaders.",
+        "Shader Parser"
+    );
+
+    let vert_src = CString::new( vert_buffer.join("\n") )
+        .map_err( |e| Error::CStringNul( format!( "{}", e ) ) )?;
+    let vert = Shader::vert_from_source( &vert_src )?;
+
+    let frag_src = CString::new( frag_buffer.join("\n") )
+        .map_err( |e| Error::CStringNul( format!( "{}", e ) ) )?;
+    let frag = Shader::frag_from_source( &frag_src )?;
+
+    Ok( [ vert, frag, ] )
 
 }
 
@@ -411,3 +306,5 @@ enum ParseKind {
     Fragment,
     None,
 }
+
+const INVALID_LOCATION:GLint = -1;

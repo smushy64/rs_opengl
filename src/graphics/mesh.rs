@@ -4,7 +4,7 @@ use gl::types::*;
 
 use super::Vertex;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Mesh {
 
     pub vertices: Vec<Vertex>,
@@ -15,7 +15,7 @@ pub struct Mesh {
     vbo: GLuint,
     ebo: GLuint,
 
-    index_count: GLint,
+    index_count: GLsizei,
 
 }
 
@@ -23,19 +23,15 @@ impl Mesh {
 
     pub fn new( vertices: Vec<Vertex>, indeces: Vec<GLuint> ) -> Self {
 
-        use core::mem::size_of;
+        const VERTEX_SIZE:GLint = 32;
+        const U32_SIZE:GLint    =  4;
+        const NORMAL_PTR_OFFSET:GLint = 12;
+        const UV_PTR_OFFSET:GLint     = 24;
 
         let index_count = indeces.len() as GLint;
 
-        let vertices_size = ( vertices.len() * size_of::<Vertex>() ) as GLsizeiptr;
-        let indeces_size  = ( index_count as usize * size_of::<GLuint>() ) as GLsizeiptr;
-
-        let f32_size = size_of::<f32>();
-        let normal_ptr_offset = ( 3 * f32_size ) as *const GLvoid;
-        let uv_ptr_offset     = ( 6 * f32_size ) as *const GLvoid;
-
-        // position = 3, normal = 3, uv = 2
-        let stride = 8 * f32_size as GLsizei;
+        let vertices_size = ( vertices.len() * VERTEX_SIZE as usize ) as GLsizeiptr;
+        let indeces_size  = ( index_count * U32_SIZE ) as GLsizei;
 
         let mut vbo:GLuint = 0;
         let mut vao:GLuint = 0;
@@ -61,7 +57,7 @@ impl Mesh {
             gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
             gl::BufferData(
                 gl::ELEMENT_ARRAY_BUFFER,
-                indeces_size,
+                indeces_size as GLsizeiptr,
                 indeces.as_ptr() as *const GLvoid,
                 gl::STATIC_DRAW
             );
@@ -70,26 +66,23 @@ impl Mesh {
             gl::EnableVertexAttribArray( 0 );
             gl::VertexAttribPointer(
                 0, 3, gl::FLOAT,
-                gl::FALSE, stride,
+                gl::FALSE, VERTEX_SIZE,
                 0 as *const GLvoid
             );
             // normals
             gl::EnableVertexAttribArray( 1 );
             gl::VertexAttribPointer(
                 1, 3, gl::FLOAT,
-                gl::FALSE, stride,
-                normal_ptr_offset,
+                gl::FALSE, VERTEX_SIZE,
+                NORMAL_PTR_OFFSET as *const GLvoid,
             );
             // uvs
             gl::EnableVertexAttribArray( 2 );
             gl::VertexAttribPointer(
                 2, 2, gl::FLOAT,
-                gl::FALSE, stride,
-                uv_ptr_offset,
+                gl::FALSE, VERTEX_SIZE,
+                UV_PTR_OFFSET as *const GLvoid,
             );
-
-            // unbind vao
-            gl::BindVertexArray( 0 );
 
         }
 
@@ -101,37 +94,28 @@ impl Mesh {
         }
     }
 
-    pub fn render(&self) {
+    pub fn bind_buffers(&self) {
         unsafe {
             gl::BindVertexArray( self.vao );
             gl::BindBuffer( gl::ARRAY_BUFFER, self.vbo );
             gl::BindBuffer( gl::ELEMENT_ARRAY_BUFFER, self.ebo );
+        }
+    }
+
+    pub fn render(&self) {
+        unsafe {
+            self.bind_buffers();
             gl::DrawElements(
                 gl::TRIANGLES,
                 self.index_count,
                 gl::UNSIGNED_INT,
                 core::ptr::null_mut() as *const GLvoid
             );
-            gl::BindVertexArray( 0 );
-            gl::BindBuffer( gl::ARRAY_BUFFER, 0 );
-            gl::BindBuffer( gl::ELEMENT_ARRAY_BUFFER, 0 );
         }
     }
 
-    pub fn vertex_count( &self ) -> GLint {
-        self.index_count
-    }
-
-    pub fn triangle_count( &self ) -> GLint {
-        self.index_count / 3
-    }
-
-    pub fn get_mesh_data( &self ) -> String {
-        format!( "vertex count: {} triangle count: {}",
-            self.vertex_count(),
-            self.triangle_count()
-        )
-    }
+    pub fn vertex_count( &self )   -> usize { self.index_count as usize }
+    pub fn triangle_count( &self ) -> usize { ( self.index_count / 3 ) as usize }
 
     pub unsafe fn empty() -> Self {
         Self {

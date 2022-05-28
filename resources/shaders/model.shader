@@ -1,6 +1,6 @@
 #vertex -------------------------------------------------------------
 
-#version 330 core
+#version 420 core
 
 layout ( location = 0 ) in vec3 Position;
 layout ( location = 1 ) in vec3 Normal;
@@ -21,10 +21,9 @@ out struct {
 
 } v2f;
 
-uniform mat4 transform;
 uniform mat4 view;
 uniform mat4 projection;
-
+uniform mat4 transform;
 uniform mat3 normal_mat;
 
 void main()
@@ -35,7 +34,7 @@ void main()
 
     v2f.vertex_color = Color;
 
-    v2f.normal = Normal;
+    v2f.normal       = Normal;
     v2f.world_normal = normal_mat * Normal;
 
     v2f.uv = UV;
@@ -46,7 +45,7 @@ void main()
 
 #fragment -----------------------------------------------------------
 
-#version 330 core
+#version 420 core
 
 in struct {
 

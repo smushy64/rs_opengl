@@ -1,9 +1,15 @@
-mod material;
 mod vertex;
-mod model;
+pub use vertex::Vertex;
+mod uniform;
+pub use uniform::Uniform;
+
+pub mod camera;
+pub use camera::Camera;
 
 pub mod shader;
-pub use shader::{ Shader, ShaderProgram, Error as ShaderError };
+pub use shader::{ Shader, ShaderProgram };
+pub mod material;
+pub use material::Material;
 
 pub mod mesh;
 pub use mesh::Mesh;
@@ -11,37 +17,29 @@ pub use mesh::Mesh;
 pub mod texture;
 pub use texture::{ Texture, Sampler };
 
-pub mod uniform;
-pub use uniform::{ MaterialUniform, UniformValue };
-
-pub use material::Material;
-pub use vertex::Vertex;
-pub use model::Model;
-
 use gl::types::*;
 use core::fmt;
 
-pub fn load_glfn( subsys:&sdl2::VideoSubsystem ) {
+use crate::log;
+
+pub fn load_glfn( video_subsystem:&sdl2::VideoSubsystem ) {
     gl::load_with(
         |symbol|
-            subsys.gl_get_proc_address(&symbol) as *const GLvoid
+            video_subsystem.gl_get_proc_address(&symbol) as *const GLvoid
     );
 }
 
-pub fn clear_color( color:&fmath::types::color::RGB ) {
+pub fn set_clear_color( color:&fmath::types::color::RGB ) {
     let rgb = color.as_tuple_rgb_f32();
-    unsafe {
-        gl::ClearColor( rgb.0, rgb.1, rgb.2, 1.0 );
-    }
+    unsafe { gl::ClearColor( rgb.0, rgb.1, rgb.2, 1.0 ); }
 }
 
+// TODO: Create clear screen mask abstraction
 pub fn clear_screen( mask:u32 ) {
-    unsafe {
-        gl::Clear( gl::COLOR_BUFFER_BIT | mask );
-    }
+    unsafe { gl::Clear( gl::COLOR_BUFFER_BIT | mask ); }
 }
 
-pub fn set_viewport( dimensions:&fmath::types::Vector2 ) {
+pub fn update_viewport( dimensions:&fmath::types::Vector2 ) {
     unsafe {
         gl::Viewport(
             0 as GLint, 0 as GLint,
@@ -50,9 +48,271 @@ pub fn set_viewport( dimensions:&fmath::types::Vector2 ) {
     }
 }
 
+/// TODO: sort meshes for rendering!
+pub struct Blend {
+    enabled: bool,
+    rgb_source_factor       : BlendFactor,
+    rgb_destination_factor  : BlendFactor,
+    alpha_source_factor     : BlendFactor,
+    alpha_destination_factor: BlendFactor,
+    blend_mode              : BlendMode,
+}
+
+impl Blend {
+    pub fn initialize() -> Self {
+        Self::gl_enable( true );
+        let src    = BlendFactor::One;
+        let dst    = BlendFactor::Zero;
+        let mode = BlendMode::Add;
+        Self::gl_blend_func( src as GLenum, dst as GLenum );
+        Self::gl_blend_equation( mode as GLenum );
+        Self {
+            enabled: true,
+            rgb_source_factor:        src,
+            rgb_destination_factor:   dst,
+            alpha_source_factor:      src,
+            alpha_destination_factor: dst,
+            blend_mode:               mode,
+        }
+    }
+
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn enable( &mut self )  { self.enabled = true;  Self::gl_enable(self.enabled) }
+    pub fn disable( &mut self ) { self.enabled = false; Self::gl_enable(self.enabled) }
+
+    pub fn src_factor_rgb( &self )   -> BlendFactor { self.rgb_source_factor        }
+    pub fn dst_factor_rgb( &self )   -> BlendFactor { self.rgb_destination_factor   }
+    pub fn src_factor_alpha( &self ) -> BlendFactor { self.alpha_source_factor      }
+    pub fn dst_factor_alpha( &self ) -> BlendFactor { self.alpha_destination_factor }
+    pub fn blend_mode( &self )       -> BlendMode   { self.blend_mode               }
+
+    pub fn set_blend_mode( &mut self, mode:BlendMode ) {
+        self.blend_mode = mode;
+        Self::gl_blend_equation( mode as GLenum );
+        log(
+            &format!( "Set blend mode to \'{}\'.", mode ),
+            "Blend"
+        );
+    }
+
+    pub fn set_blend_factor( &mut self, src:BlendFactor, dst:BlendFactor ) {
+        self.rgb_source_factor      = src;
+        self.rgb_destination_factor = dst;
+        self.alpha_source_factor      = src;
+        self.alpha_destination_factor = dst;
+        Self::gl_blend_func( src as GLenum, dst as GLenum );
+        log(
+            &format!(
+                "Set src factor to \'{}\' and dst factor to \'{}\'",
+                src, dst
+            ),
+            "Blend"
+        );
+    }
+
+    pub fn set_blend_factor_separate( &mut self,
+        src_rgb:BlendFactor, dst_rgb:BlendFactor,
+        src_a:BlendFactor, dst_a:BlendFactor )
+    {
+        self.rgb_source_factor        = src_rgb;
+        self.rgb_destination_factor   = dst_rgb;
+        self.alpha_source_factor      = src_a;
+        self.alpha_destination_factor = dst_a;
+        Self::gl_blend_func_sep(
+            src_rgb as GLenum, dst_rgb as GLenum,
+            src_a   as GLenum, dst_a as GLenum
+        );
+        log(
+            &format!(
+                "Set src factor RGB to \'{}\' dst factor RGB to \'{}\' src factor Alpha to \'{}\' and dst factor Alpha to \'{}\'",
+                src_rgb, dst_rgb, src_a, dst_a
+            ),
+            "Blend"
+        );
+    }
+
+    fn gl_blend_equation( mode:GLenum ) {
+        unsafe {
+            gl::BlendEquation( mode );
+        }
+    }
+
+    fn gl_blend_func( src:GLenum, dst:GLenum ) {
+        unsafe {
+            gl::BlendFunc( src, dst );
+        }
+    }
+
+    fn gl_blend_func_sep( src_rgb:GLenum, dst_rgb:GLenum, src_a:GLenum, dst_a:GLenum ) {
+        unsafe {
+            gl::BlendFuncSeparate(
+                src_rgb, dst_rgb,
+                src_a, dst_a
+            );
+        }
+    }
+
+    fn gl_enable( b:bool ) {
+        if b {
+            unsafe{ gl::Enable( gl::BLEND ) }
+            log(
+                "Blending Enabled",
+                "Blend"
+            );
+        }
+        else {
+            unsafe{ gl::Disable( gl::BLEND ) }
+            log(
+                "Blending Disabled",
+                "Blend"
+            );
+        }
+    }
+}
+
+impl fmt::Display for Blend {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f,
+            "Src RGB Factor: \'{}\' Src Alpha Factor: \'{}\' Dst RGB Factor: \'{}\' Dst Alpha Factor: \'{}\' Mode: \'{}\'",
+            self.src_factor_rgb(), self.src_factor_alpha(),
+            self.dst_factor_rgb(), self.dst_factor_alpha(),
+            self.blend_mode()
+        )
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum BlendMode {
+    Add             = 0x8006,
+    Subtract        = 0x800A,
+    ReverseSubtract = 0x800B,
+    Min             = 0x8007,
+    Max             = 0x8008,
+}
+
+impl TryFrom<GLenum> for BlendMode {
+    type Error = ();
+
+    fn try_from(value: GLenum) -> Result<Self, Self::Error> {
+        match value {
+            0x800A => Ok( Self::Subtract        ),
+            0x800B => Ok( Self::ReverseSubtract ),
+            0x8007 => Ok( Self::Min             ),
+            0x8008 => Ok( Self::Max             ),
+            _      => Ok( Self::Add             ),
+        }
+    }
+}
+
+impl BlendMode {
+    pub fn as_glenum(&self) -> GLenum { *self as GLenum }
+    pub fn from_glenum( g:GLenum ) -> Self { g.try_into().unwrap() }
+
+    pub fn msg(&self) -> &str {
+        match self {
+            Self::Add             => "Add",
+            Self::Subtract        => "Subtract",
+            Self::ReverseSubtract => "ReverseSubtract",
+            Self::Min             => "Min",
+            Self::Max             => "Max",
+        }
+    }
+}
+
+impl fmt::Display for BlendMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f, "{}", self.msg() )
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum BlendFactor {
+    /// Factor is equal to 0
+    Zero                  = 0     ,
+    /// Factor is equal to 1
+    One                   = 1     ,
+    /// Factor is equal to the source color vector
+    SrcColor              = 0x300 ,
+    /// Factor is equal to 1 - source color vector
+    OneMinusSrcColor      = 0x301 ,
+    /// Factor is equal to the source alpha vector
+    SrcAlpha              = 0x302 ,
+    /// Factor is equal to 1 - source alpha vector
+    OneMinusSrcAlpha      = 0x303 ,
+    /// Factor is equal to the destination color vector
+    DstColor              = 0x306 ,
+    /// Factor is equal to 1 - destination color vector
+    OneMinusDstColor      = 0x307 ,
+    /// Factor is equal to the destination alpha vector
+    DstAlpha              = 0x304 ,
+    /// Factor is equal to 1 - destination alpha vector
+    OneMinusDstAlpha      = 0x305 ,
+    /// Factor is equal to the constant color vector
+    ConstantColor         = 0x8001,
+    /// Factor is equal to 1 - constant color vector
+    OneMinusConstantColor = 0x8002,
+    /// Factor is equal to the constant alpha vector
+    ConstantAlpha         = 0x8003,
+    /// Factor is equal to 1 - constant alpha vector
+    OneMinusConstantAlpha = 0x8004,
+}
+
+impl TryFrom<GLenum> for BlendFactor {
+    type Error = ();
+
+    fn try_from(value: GLenum) -> Result<Self, Self::Error> {
+        match value {
+            1      => Ok( Self::One                   ),
+            0x300  => Ok( Self::SrcColor              ),
+            0x301  => Ok( Self::OneMinusSrcColor      ),
+            0x302  => Ok( Self::SrcAlpha              ),
+            0x303  => Ok( Self::OneMinusSrcAlpha      ),
+            0x304  => Ok( Self::DstAlpha              ),
+            0x305  => Ok( Self::OneMinusDstAlpha      ),
+            0x306  => Ok( Self::DstColor              ),
+            0x307  => Ok( Self::OneMinusDstColor      ),
+            0x8001 => Ok( Self::ConstantColor         ),
+            0x8002 => Ok( Self::OneMinusConstantColor ),
+            0x8003 => Ok( Self::ConstantAlpha         ),
+            0x8004 => Ok( Self::OneMinusConstantAlpha ),
+            _      => Ok( Self::Zero                  ),
+        }
+    }
+}
+
+impl BlendFactor {
+    pub fn as_glenum(&self) -> GLenum { *self as GLenum }
+    pub fn from_glenum( g:GLenum ) -> Self { g.try_into().unwrap() }
+
+    pub fn msg(&self) -> &str {
+        match self {
+            Self::Zero                  => "Zero",
+            Self::One                   => "One",
+            Self::SrcColor              => "Src Color",
+            Self::OneMinusSrcColor      => "One Minus Src Color",
+            Self::SrcAlpha              => "Src Alpha",
+            Self::OneMinusSrcAlpha      => "One Minus Src Alpha",
+            Self::DstAlpha              => "Dst Alpha",
+            Self::OneMinusDstAlpha      => "One Minus Dst Alpha",
+            Self::DstColor              => "Dst Color",
+            Self::OneMinusDstColor      => "One Minus Dst Color",
+            Self::ConstantColor         => "Constant Color",
+            Self::OneMinusConstantColor => "One Minus Constant Color",
+            Self::ConstantAlpha         => "Constant Alpha",
+            Self::OneMinusConstantAlpha => "One Minus Constant Alpha",
+        }
+    }
+}
+
+impl fmt::Display for BlendFactor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f, "{}", self.msg() )
+    }
+}
+
 pub struct StencilTest {
-    enabled:   bool,
-    mask:      GLuint,
+    enabled: bool,
+    mask:    GLuint,
 }
 
 impl StencilTest {
@@ -130,27 +390,27 @@ impl StencilAction {
 
     pub fn as_glenum( &self ) -> GLenum {
         match self {
-            Self::Keep         => gl::KEEP     ,
-            Self::Zero         => gl::ZERO     ,
-            Self::Replace      => gl::REPLACE  ,
-            Self::Increase     => gl::INCR     ,
-            Self::IncreaseWrap => gl::INCR_WRAP,
-            Self::Decrease     => gl::DECR     ,
-            Self::DecreaseWrap => gl::DECR_WRAP,
-            Self::Invert       => gl::INVERT   ,
+            Self::Keep         => gl::KEEP      ,
+            Self::Zero         => gl::ZERO      ,
+            Self::Replace      => gl::REPLACE   ,
+            Self::Increase     => gl::INCR      ,
+            Self::IncreaseWrap => gl::INCR_WRAP ,
+            Self::Decrease     => gl::DECR      ,
+            Self::DecreaseWrap => gl::DECR_WRAP ,
+            Self::Invert       => gl::INVERT    ,
         }
     }
 
-    pub fn msg(&self) -> String {
+    pub fn msg(&self) -> &str {
         match self {
-            Self::Keep         => format!( "Keep" ),
-            Self::Zero         => format!( "Zero" ),
-            Self::Replace      => format!( "Replace" ),
-            Self::Increase     => format!( "Increase" ),
-            Self::IncreaseWrap => format!( "Increase Wrap" ),
-            Self::Decrease     => format!( "Decrease" ),
-            Self::DecreaseWrap => format!( "Decrease Wrap" ),
-            Self::Invert       => format!( "Invert" ),
+            Self::Keep         => "Keep"          ,
+            Self::Zero         => "Zero"          ,
+            Self::Replace      => "Replace"       ,
+            Self::Increase     => "Increase"      ,
+            Self::IncreaseWrap => "Increase Wrap" ,
+            Self::Decrease     => "Decrease"      ,
+            Self::DecreaseWrap => "Decrease Wrap" ,
+            Self::Invert       => "Invert"        ,
         }
     }
 }
@@ -203,10 +463,10 @@ impl DepthTest {
 
 impl fmt::Display for DepthTest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let enabled = if self.is_enabled() {
+        let dt_info = if self.is_enabled() {
             format!( "Enabled: {}", self.depth_test_kind() )
         } else { format!("Disabled.") };
-        write!( f, "Depth Test is {}", enabled )
+        write!( f, "Depth Test is {}", dt_info )
     }
 }
 
@@ -226,27 +486,27 @@ impl TestKind {
 
     pub fn as_glenum( &self ) -> GLenum {
         match self {
-            Self::Always        => gl::ALWAYS  ,
-            Self::Never         => gl::NEVER   ,
-            Self::Less          => gl::LESS    ,
-            Self::Equal         => gl::EQUAL   ,
-            Self::LessEquals    => gl::LEQUAL  ,
-            Self::Greater       => gl::GREATER ,
-            Self::GreaterEquals => gl::GEQUAL  ,
-            Self::NotEqual      => gl::NOTEQUAL,
+            Self::Always        => gl::ALWAYS   ,
+            Self::Never         => gl::NEVER    ,
+            Self::Less          => gl::LESS     ,
+            Self::Equal         => gl::EQUAL    ,
+            Self::LessEquals    => gl::LEQUAL   ,
+            Self::Greater       => gl::GREATER  ,
+            Self::GreaterEquals => gl::GEQUAL   ,
+            Self::NotEqual      => gl::NOTEQUAL ,
         }
     }
 
-    pub fn msg(&self) -> String {
+    pub fn msg(&self) -> &str {
         match self {
-            Self::Always        => format!( "Always" ),
-            Self::Never         => format!( "Never" ),
-            Self::Less          => format!( "Less" ),
-            Self::Equal         => format!( "Equal" ),
-            Self::LessEquals    => format!( "Less Equals" ),
-            Self::Greater       => format!( "Greater" ),
-            Self::GreaterEquals => format!( "Greater Equals" ),
-            Self::NotEqual      => format!( "Not Equal" ),
+            Self::Always        => "Always"         ,
+            Self::Never         => "Never"          ,
+            Self::Less          => "Less"           ,
+            Self::Equal         => "Equal"          ,
+            Self::LessEquals    => "Less Equals"    ,
+            Self::Greater       => "Greater"        ,
+            Self::GreaterEquals => "Greater Equals" ,
+            Self::NotEqual      => "Not Equal"      ,
         }
     }
 }

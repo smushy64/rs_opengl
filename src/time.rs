@@ -3,12 +3,12 @@ use core::fmt;
 pub struct Time {
     
     elapsed_ticks: u32,
-    elapsed_ms: ms,
+    elapsed_ms: Milliseconds,
 
     last_elapsed_ticks: u32,
 
     delta_ticks: u32,
-    delta_ms:    ms,
+    delta_ms:    Milliseconds,
 
 }
 
@@ -17,10 +17,10 @@ impl Time {
     pub fn new() -> Self {
         Self {
             elapsed_ticks: 0,
-            elapsed_ms: ms::new(),
+            elapsed_ms: Milliseconds{ t: 0.0, dirty: true },
             last_elapsed_ticks: 0,
             delta_ticks: 0,
-            delta_ms: ms::new(),
+            delta_ms: Milliseconds{ t: 0.0, dirty: true },
         }
     }
 
@@ -59,14 +59,7 @@ impl fmt::Display for Time {
     }
 }
 
-#[allow(non_camel_case_types)]
-struct ms {
+struct Milliseconds {
     t:f32,
     dirty:bool
-}
-
-impl ms {
-    pub fn new() -> Self {
-        Self { t: 0.0, dirty: true, }
-    }
 }

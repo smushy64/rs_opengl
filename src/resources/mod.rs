@@ -1,16 +1,14 @@
 extern crate wavefront_obj;
-use core::fmt;
 #[allow(unused_imports)]
 use std::{
     env, fs,
     path::{ PathBuf, Path },
-    ffi::{ CString, CStr }
 };
 use crate::{
     graphics::{
         *, texture::{ TextureOptions, ImageGL },
         shader::shader_parser,
-    }, Rc
+    }, Rc, cstr::*, debugging::Error
 };
 
 mod image_loader;
@@ -32,7 +30,7 @@ pub fn load_program_info() -> Result<super::ProgramInfo, Error> {
             let symbols:Vec<&str> = line.split("[title] ").collect();
             if symbols.len() < 2 {
                 return Err(
-                    Error::ReadFile( format!("Load Settings Error: Formatted incorrectly!") )
+                    Error::ResourcesReadFile( format!("Program Info formatted incorrectly!") )
                 )
             }
             title.push_str( symbols[1] );
@@ -41,13 +39,13 @@ pub fn load_program_info() -> Result<super::ProgramInfo, Error> {
             let symbols:Vec<&str> = line.split_whitespace().collect();
             if symbols.len() < 2 {
                 return Err(
-                    Error::ReadFile( format!("Load Settings Error: Formatted incorrectly!") )
+                    Error::ResourcesReadFile( format!("Program Info formatted incorrectly!") )
                 )
             }
             let v = match symbols[1].parse::<f32>() {
                 Ok(res) => res,
                 Err(e) => return Err(
-                    Error::ReadFile( format!("Load Settings Error: {}", e) )
+                    Error::ParseFloat( format!( "{}", e ) )
                 ),
             };
             if line.contains(".x") {
@@ -70,9 +68,7 @@ pub fn load_meshes( local_path:&str ) -> Result< Rc<Vec<Mesh>>, Error > {
             let ext_str = match ext.to_str() {
                 Some(res) => res,
                 None => return Err(
-                    Error::UTF8Conversion(
-                        format!( "Load Meshes Error: Failed to convert &OsStr to &str!" )
-                    )
+                    Error::UTF8( format!( "Failed to convert &OsStr to &str in resources::load_meshes!" ) )
                 ),
             };
             match ext_str {
@@ -94,17 +90,13 @@ pub fn load_meshes( local_path:&str ) -> Result< Rc<Vec<Mesh>>, Error > {
                     Ok( Rc::new( result ) )
                 }
                 _ => return Err(
-                    Error::UnrecognizedFileExt(
-                        format!("Load Meshes Error: \"{}\" is an unrecognized file extension!", ext_str)
+                    Error::ResourcesUnrecognizedFileExt(
+                        format!("\"{}\" is an unrecognized file extension!", ext_str)
                     )
                 ),
             }
         },
-        None => return Err(
-            Error::NoFileType(
-                format!("Load Meshes Error: No file type specified!")
-            )
-        ),
+        None => return Err( Error::ResourcesNoFileType( format!("No file type specified!") ) ),
     }
 
 }
@@ -118,8 +110,7 @@ pub fn load_texture( local_path:&str, options:TextureOptions ) -> Result<Rc<Text
 
 pub fn load_texture_path( path:&PathBuf, options:TextureOptions ) -> Result<Rc<Texture>, Error> {
     let dynamic_image = load_image_path( path )?;
-    let gl_image = ImageGL::from_dynamic_image( dynamic_image )
-        .map_err( |e| Error::LoadImage( format!("{}", e) ) )?;
+    let gl_image = ImageGL::from_dynamic_image( dynamic_image )?;
     Ok( Texture::new( gl_image, options ) )
 }
 
@@ -127,10 +118,7 @@ pub fn load_image( local_path:&str ) -> Result<DynamicImage, Error> {
     load_image_path( &resource_path_from_local_path(local_path) )
 }
 
-pub fn load_image_path( path:&PathBuf ) -> Result<DynamicImage, Error> {
-    image_loader::load_image(path)
-        .map_err( |e| Error::LoadImage(e) )
-}
+pub fn load_image_path( path:&PathBuf ) -> Result<DynamicImage, Error> { image_loader::load_image(path) }
 
 pub fn load_shader_program( local_path:&str ) -> Result<Rc<ShaderProgram>, Error> {
     let mut path = resource_path_from_local_path( &format!( "shaders/{}", local_path ) );
@@ -139,10 +127,8 @@ pub fn load_shader_program( local_path:&str ) -> Result<Rc<ShaderProgram>, Error
 }
 
 pub fn load_shader_program_path( path:&PathBuf ) -> Result<Rc<ShaderProgram>, Error> {
-    let shader_source = shader_parser( load_string_path(path)? )
-        .map_err( |e| Error::ShaderParse(e.msg()) )?;
+    let shader_source = shader_parser( &load_string_path(path)? )?;
     ShaderProgram::from_shaders( &shader_source )
-        .map_err( |e| Error::ShaderParse( e.msg() ) )
 }
 
 pub fn load_cstring( local_path:&str ) -> Result<CString, Error> {
@@ -153,11 +139,7 @@ pub fn load_cstring_path( path:&PathBuf ) -> Result<CString, Error> {
     let bytes = load_bytes_path(path)?;
     for byte in bytes.iter() {
         if *byte == 0 {
-            return Err(
-                Error::CStringContainsNull(
-                    format!("Load CString Error: File contains null character!")
-                )
-            )
+            return Err( Error::CStringNul( format!("File contains null character!") ) )
         }
     }
     Ok( unsafe { CString::from_vec_unchecked( bytes ) } )
@@ -172,12 +154,7 @@ pub fn load_string_path( path:&PathBuf ) -> Result<String, Error> {
     Ok( 
         String::from( 
             core::str::from_utf8(&bytes)
-                .map_err(
-                    |e|
-                    Error::UTF8Conversion(
-                        format!("Load String Error: {}", e)
-                    )
-                )?
+                .map_err( |e| Error::UTF8( format!("{}", e) ) )?
         )
     )
 }
@@ -187,14 +164,10 @@ pub fn load_bytes( local_path:&str ) -> Result<Vec<u8>, Error> {
 }
 
 pub fn load_bytes_path( path:&PathBuf ) -> Result<Vec<u8>, Error> {
-    match fs::read( path ) {
-        Ok(result) => Ok( result ),
-        Err(error) => Err(
-            Error::ReadFile(
-                format!("Load Bytes Error, at path: {}\n{}", path.to_string_lossy().into_owned(), error)
-            )
-        ),
-    }
+    fs::read( path )
+        .map_err( |e| Error::ResourcesReadFile(
+            format!( "{} at {:?}", e, path.to_str().unwrap().replace("\\", "/") )
+        ) )
 }
 
 const LOCAL_SEPARATOR:char = '/';
@@ -221,48 +194,7 @@ pub fn initialize() {
         let exe_path = env::current_exe().unwrap();
         let mut resources = PathBuf::from(exe_path.parent().unwrap());
         resources.push("resources");
-        RESOURCES_PATH = String::from(resources.to_str().unwrap());
-    }
-}
-
-#[derive(Debug)]
-pub enum Error {
-
-    ReadFile(String),
-
-    UTF8Conversion(String),
-
-    CStringContainsNull(String),
-
-    LoadImage(String),
-
-    ShaderParse(String),
-
-    NoFileType(String),
-    UnrecognizedFileExt(String),
-
-    OBJParse(String),
-
-}
-
-impl Error {
-    pub fn msg( &self ) -> String {
-        match self {
-            Error::ReadFile            (s) => s.clone(),
-            Error::UTF8Conversion      (s) => s.clone(),
-            Error::CStringContainsNull (s) => s.clone(),
-            Error::LoadImage           (s) => s.clone(),
-            Error::ShaderParse         (s) => s.clone(),
-            Error::NoFileType          (s) => s.clone(),
-            Error::UnrecognizedFileExt (s) => s.clone(),
-            Error::OBJParse            (s) => s.clone(),
-        }
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f, "{}", self.msg() )
+        RESOURCES_PATH = String::from( resources.to_str().unwrap() );
     }
 }
 

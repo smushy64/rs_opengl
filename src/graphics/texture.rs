@@ -1,8 +1,9 @@
 use gl::types::*;
-use crate::Rc;
+use crate::{ Rc, debugging::Error };
 use core::fmt;
 use fmath::types::color::RGB;
 
+#[derive(Debug)]
 pub struct Texture {
     handle:GLuint,
     image:ImageGL,
@@ -11,11 +12,11 @@ pub struct Texture {
 
 impl Texture {
 
-    pub fn empty() -> Self {
-        Self {
+    pub fn empty() -> Rc<Self> {
+        Rc::new( Self {
             handle: 0, image:ImageGL::empty(),
             options:TextureOptions::default()
-        }
+        } )
     }
 
     pub fn new_color_texture( color:RGB ) -> Rc<Self> {
@@ -38,9 +39,10 @@ impl Texture {
                 
             match options.border_color {
                 Some(c) => {
+                    let col = c.as_array_rgba_f32();
                     gl::TexParameterfv(
                         gl::TEXTURE_2D, gl::TEXTURE_BORDER_COLOR,
-                        c.as_array_rgba_f32().as_ptr()
+                        col.as_ptr()
                     );
                 },
                 None => {},
@@ -65,7 +67,7 @@ impl Texture {
             );
 
             gl::TexImage2D(
-                gl::TEXTURE_2D, 0, gl::RGB as GLint,
+                gl::TEXTURE_2D, 0, image.format as GLint,
                 image.width, image.height,
                 0, image.format, gl::UNSIGNED_BYTE,
                 image.data.as_ptr() as *const GLvoid
@@ -97,6 +99,14 @@ impl Texture {
 
 }
 
+impl fmt::Display for Texture {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f, "Texture {} | width: {} height: {} size (bytes): {}",
+            self.handle(), self.width(), self.height(), self.image_data().len()
+        )
+    }
+}
+
 pub unsafe fn delete_textures( textures: Vec<Rc<Texture>> ) {
 
     let mut handles:Vec<GLuint> = Vec::with_capacity( textures.len() );
@@ -112,7 +122,7 @@ pub unsafe fn delete_textures( textures: Vec<Rc<Texture>> ) {
     gl::DeleteTextures( handles.len() as GLsizei, handles.as_ptr() );
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Sampler { id:GLint }
 
 impl Sampler {
@@ -130,11 +140,11 @@ impl Sampler {
 
 impl fmt::Display for Sampler {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f, "TEXTURE {}\n", self.id() )
+        write!( f, "TEXTURE {}", self.id() )
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct TextureOptions {
     wrapping_x:TextureWrapping, wrapping_y:TextureWrapping,
     min_filtering:MipmapFiltering, mag_filtering:TextureFiltering,
@@ -177,7 +187,7 @@ impl TextureOptions {
 
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum TextureWrapping {
     Repeat,
     MirroredRepeat,
@@ -196,7 +206,7 @@ impl TextureWrapping {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum TextureFiltering {
     Nearest,
     Linear,
@@ -211,7 +221,7 @@ impl TextureFiltering {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum MipmapFiltering {
     NearestNearest,
     LinearNearest,
@@ -230,6 +240,7 @@ impl MipmapFiltering {
     }
 }
 
+#[derive(Debug)]
 pub struct ImageGL {
     pub width:GLint, pub height:GLint,
     pub format:GLenum,
@@ -252,9 +263,7 @@ impl ImageGL {
         let ( format, data) = match dynamic.color() {
             image::ColorType::Rgb8  => ( gl::RGB,  dynamic.to_rgb8().as_raw().clone()  ),
             image::ColorType::Rgba8 => ( gl::RGBA, dynamic.to_rgba8().as_raw().clone() ),
-            _ => return Err(
-                Error::UnsupportedColorFormat( format!( "Load Texture Error: Unsupported Color Format!" ) )
-            ),
+            _ => return Err( Error::TextureUnsupportedColorFormat ),
         };
 
         Ok( 
@@ -267,18 +276,4 @@ impl ImageGL {
 
     }
 
-}
-
-#[derive(Debug)]
-pub enum Error {
-    UnsupportedColorFormat(String),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let msg = match self {
-            Error::UnsupportedColorFormat(s) => s,
-        };
-        write!( f, "{}", msg )
-    }
 }

@@ -8,12 +8,17 @@ Crates in use:
 - [gl](https://crates.io/crates/gl)
 - [SDL2](https://crates.io/crates/sdl2)
 - [image](https://crates.io/crates/image)
+- [colored](https://crates.io/crates/colored)
 - [fmath](https://github.com/smushy64/fmath)
 - [wavefront_obj](https://github.com/smushy64/rs_wavefront_obj_parser)
 
 ### [Demos](bin/releases/)
 
 ## Progress Images
+
+### Transparency and Blending | [Demo](bin/releases/transparency_blending/)
+
+![Transparency and Blending](progress/transparency_blending.jpg)
 
 ### Stencil and Depth Buffer | [Demo](bin/releases/stencil_depth/)
 
@@ -22,7 +27,3 @@ Crates in use:
 ### Advanced Mesh Loading | [Demo](bin/releases/advanced_mesh_loading/)
 
 ![Advanced Mesh Loading](progress/advanced_load_mesh.jpg)
-
-### Load .obj | [Demo](bin/releases/load_obj/)
-
-![Load .obj](progress/load_obj.jpg)
