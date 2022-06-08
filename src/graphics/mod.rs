@@ -1,21 +1,23 @@
-mod vertex;
-pub use vertex::Vertex;
 mod uniform;
-pub use uniform::Uniform;
+pub use uniform::{ Uniform, UniformBlock };
 
 pub mod camera;
 pub use camera::Camera;
 
 pub mod shader;
-pub use shader::{ Shader, ShaderProgram };
+pub use shader::{ Shader, ShaderProgram, null_shader };
 pub mod material;
 pub use material::Material;
 
 pub mod mesh;
 pub use mesh::Mesh;
+pub mod model;
+pub use model::Model;
 
 pub mod texture;
 pub use texture::{ Texture, Sampler };
+
+pub mod light;
 
 use gl::types::*;
 use core::fmt;
@@ -52,8 +54,39 @@ pub fn clear_screen( mask:u32 ) {
 #[derive(Debug, Clone, Copy)]
 pub enum ScreenBuffers {
     Color   = 0x4000,
-    Depth   = 0x100,
-    Stencil = 0x400,
+    Depth   = 0x100 ,
+    Stencil = 0x400 ,
+}
+
+impl TryFrom<GLenum> for ScreenBuffers {
+    type Error = ();
+
+    fn try_from(value: GLenum) -> Result<Self, Self::Error> {
+        match value {
+            0x100  => Ok( Self::Depth   ),
+            0x400  => Ok( Self::Stencil ),
+            _      => Ok( Self::Color   ),
+        }
+    }
+}
+
+impl ScreenBuffers {
+    pub fn as_glenum(&self) -> GLenum { *self as GLenum }
+    pub fn from_glenum( g:GLenum ) -> Self { g.try_into().unwrap() }
+
+    pub fn msg(&self) -> &str {
+        match self {
+            Self::Color   => "Color"   ,
+            Self::Depth   => "Depth"   ,
+            Self::Stencil => "Stencil" ,
+        }
+    }
+}
+
+impl fmt::Display for ScreenBuffers {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f, "{}", self.msg() )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -84,11 +117,11 @@ impl Culling {
 
     pub fn is_enabled(&self) -> bool { self.enabled }
     pub fn update_gl( &self )   {
-        Self::gl_enable( self.enabled );
         if self.enabled {
+            Self::gl_enable( true );
             Self::gl_set_winding_order( self.order as GLenum );
             Self::gl_set_culling_mode( self.mode as GLenum );
-        }
+        } else { Self::gl_enable( false ); }
     }
     pub fn enable( &mut self )  { self.enabled = true;  }
     pub fn disable( &mut self ) { self.enabled = false; }
@@ -520,7 +553,8 @@ impl StencilTest {
     }
 }
 
-#[derive(Clone, Copy)]
+// TODO: tryfrom glenum
+#[derive(Debug, Clone, Copy)]
 pub enum StencilAction {
     /// The currently stored stencil value is kept.
     Keep,
@@ -624,7 +658,8 @@ impl fmt::Display for DepthTest {
     }
 }
 
-#[derive(Clone, Copy)]
+// TODO: tryfrom glenum
+#[derive( Debug, Clone, Copy )]
 pub enum TestKind {
     Always,
     Never,

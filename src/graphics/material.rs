@@ -1,6 +1,6 @@
 use gl::types::*;
 use crate::{ Rc, debugging::Error };
-use super::{ ShaderProgram, Uniform };
+use super::{ ShaderProgram, Uniform, null_shader };
 use core::{ fmt, ops::{ Index, IndexMut } };
 
 pub struct Material {
@@ -13,6 +13,10 @@ impl Material {
     pub fn new( shader:Rc<ShaderProgram> ) -> Self {
         let uniforms = shader.generate_uniforms();
         Self { shader, uniforms }
+    }
+
+    pub fn new_null() -> Self {
+        Self::new( null_shader() )
     }
 
     pub fn clone_from( m:&Self ) -> Self {
@@ -28,6 +32,11 @@ impl Material {
             let dirty_flag = &mut self.uniforms.1[idx];
             uniform.send_if_dirty( *dirty_flag );
             *dirty_flag = false;
+        }
+    }
+    pub fn send_all_uniforms_to_gl(&self) {
+        for uniform in self.uniforms.0.iter() {
+            uniform.send_to_gl();
         }
     }
     pub fn use_material(&mut self) { self.use_shader(); self.send_uniforms_to_gl(); }

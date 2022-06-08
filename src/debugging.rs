@@ -24,6 +24,7 @@ pub enum Error {
     ImageCrateLoad(String),
 
     OBJParse(String),
+    GLTFJsonError(String),
 
     TextureUnsupportedColorFormat,
 
@@ -51,6 +52,7 @@ impl Error {
             Self::ResourcesUnrecognizedFileExt(_) => "Resources",
 
             Self::OBJParse(_) => "Wavefront OBJ Parser",
+            Self::GLTFJsonError(_) => "glTF Parser",
 
             Self::TextureUnsupportedColorFormat => "Texture",
 
@@ -76,6 +78,7 @@ impl Error {
             Self::ResourcesNoFileType(s)          |
             Self::ResourcesUnrecognizedFileExt(s) |
             Self::OBJParse(s)                     |
+            Self::GLTFJsonError(s)                |
             Self::ShaderLinker(s)                 |
             Self::ShaderCompiler(s)               |
             Self::ShaderParse(s)                  |
@@ -130,7 +133,7 @@ pub fn version_str() -> ( GLint, GLint ) {
     ( major, minor )
 }
 
-fn gl_str( name:&GLenum ) -> &str {
+pub fn gl_str( name:&GLenum ) -> &str {
     unsafe {
         use cstr::CStr;
         let ptr = gl::GetString( *name );

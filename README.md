@@ -11,10 +11,15 @@ Crates in use:
 - [colored](https://crates.io/crates/colored)
 - [fmath](https://github.com/smushy64/fmath)
 - [wavefront_obj](https://github.com/smushy64/rs_wavefront_obj_parser)
+- [rs_gltf](https://github.com/smushy64/rs_gltf)
 
 ### [Demos](bin/releases/)
 
 ## Progress Images
+
+### glTF Scene Loading and Uniform Block Buffers | [Demo](bin/releases/uniform_block/)
+
+![glTF Scene Loading and Uniform Block Buffers](progress/uniform_block.jpg)
 
 ### Transparency and Blending | [Demo](bin/releases/transparency_blending/)
 
@@ -23,7 +28,3 @@ Crates in use:
 ### Stencil and Depth Buffer | [Demo](bin/releases/stencil_depth/)
 
 ![Stencil and Depth Buffer](progress/stencil_depth.jpg)
-
-### Advanced Mesh Loading | [Demo](bin/releases/advanced_mesh_loading/)
-
-![Advanced Mesh Loading](progress/advanced_load_mesh.jpg)

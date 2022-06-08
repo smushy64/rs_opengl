@@ -10,6 +10,8 @@ pub struct Time {
     delta_ticks: u32,
     delta_ms:    Milliseconds,
 
+    time_scale: f32,
+
 }
 
 impl Time {
@@ -21,6 +23,7 @@ impl Time {
             last_elapsed_ticks: 0,
             delta_ticks: 0,
             delta_ms: Milliseconds{ t: 0.0, dirty: true },
+            time_scale: 1.0,
         }
     }
 
@@ -44,12 +47,24 @@ impl Time {
         self.elapsed_ms.t
     }
 
-    pub fn delta_time( &mut self ) -> f32 {
+    pub fn unscaled_delta_time( &mut self ) -> f32 {
         if self.delta_ms.dirty {
             self.delta_ms.t = self.delta_ticks as f32 / 1000.0
         }
         self.delta_ms.t
     }
+
+    pub fn set_time_scale( &mut self, scale: f32 ) {
+        self.time_scale = scale;
+    }
+
+    pub fn time_scale(&self) -> f32 { self.time_scale }
+
+    pub fn delta_time( &mut self ) -> f32 {
+        self.unscaled_delta_time() * self.time_scale()
+    }
+
+    pub fn fps(&mut self) -> f32 { 1.0 / self.unscaled_delta_time() }
 
 }
 

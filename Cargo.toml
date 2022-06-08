@@ -7,6 +7,7 @@ edition = "2021"
 fmath = { path = "W:/rs/fmath" }
 sdl2  = { version = "0.35.2", features = [ "bundled", "static-link" ] }
 wavefront_obj = { git = "https://github.com/smushy64/rs_wavefront_obj_parser.git" }
+rs_gltf = { git = "https://github.com/smushy64/rs_gltf.git" }
 gl      = "0.14.0"
 image   = "0.24.2"
 colored = "2.0.0"

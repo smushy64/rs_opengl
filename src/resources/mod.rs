@@ -1,4 +1,5 @@
 extern crate wavefront_obj;
+extern crate rs_gltf;
 #[allow(unused_imports)]
 use std::{
     env, fs,
@@ -23,7 +24,7 @@ pub fn load_program_info() -> Result<super::ProgramInfo, Error> {
     let path = resource_path_from_local_path( "program/program_info.txt" );
     let settings_src = load_string_path( &path )?;
     let lines:Vec<&str> = settings_src.split('\n').collect();
-    let mut title = format!("OpenGL | ");
+    let mut title = String::new();
     let mut dimensions = fmath::types::Vector2::new_zero();
     for line in lines.iter() {
         if line.contains( "[title] " ) {
@@ -58,10 +59,9 @@ pub fn load_program_info() -> Result<super::ProgramInfo, Error> {
     return Ok( super::ProgramInfo{ title, dimensions } )
 }
 
-pub fn load_meshes( local_path:&str ) -> Result< Rc<Vec<Mesh>>, Error > {
+pub fn load_meshes( local_path:&str ) -> Result< Vec<Rc<Mesh>>, Error > {
 
     let path = resource_path_from_local_path( &format!( "models/{}", local_path ) );
-    
     // determine file type
     match path.extension() {
         Some(ext) => {
@@ -74,21 +74,16 @@ pub fn load_meshes( local_path:&str ) -> Result< Rc<Vec<Mesh>>, Error > {
             match ext_str {
                 OBJ_EXT => {
                     let raw = load_string_path( &path )?;
-                    let objects = wavefront_obj::parse_obj( raw )
+                    let mesh_objs = wavefront_obj::parse_obj( raw )
                         .map_err( |e| Error::OBJParse( e.msg() ) )?;
-                    let result = {
-                        let mut mesh_buffer:Vec<Mesh> = Vec::with_capacity( objects.len() );
-                        for object in objects {
-                            let ( vertices_raw, indeces ) = object.as_opengl_format();
-                            let vertices_formatted = unsafe {
-                                Vertex::from_vec_unchecked( vertices_raw )
-                            };
-                            mesh_buffer.push( Mesh::new( vertices_formatted, indeces ) )
-                        }
-                        mesh_buffer
-                    };
-                    Ok( Rc::new( result ) )
+                    Ok( Mesh::from_obj( mesh_objs ) )
                 }
+                GLTF_JSON_EXT => {
+                    let raw = load_string_path( &path )?;
+                    let gltf = rs_gltf::parse_into_gltf( &raw )
+                        .map_err( |e| Error::GLTFJsonError( e.msg().to_owned() ) )?;
+                    Ok( Mesh::from_gltf( gltf )? )
+                },
                 _ => return Err(
                     Error::ResourcesUnrecognizedFileExt(
                         format!("\"{}\" is an unrecognized file extension!", ext_str)
@@ -101,7 +96,11 @@ pub fn load_meshes( local_path:&str ) -> Result< Rc<Vec<Mesh>>, Error > {
 
 }
 
-pub fn load_texture( local_path:&str, options:TextureOptions ) -> Result<Rc<Texture>, Error> {
+pub fn load_texture( local_path:&str, options:Option<TextureOptions> ) -> Result<Rc<Texture>, Error> {
+    let options = match options {
+        Some(options) => options,
+        None => TextureOptions::default(),
+    };
     load_texture_path(
         &resource_path_from_local_path( &format!( "textures/{}", local_path ) ),
         options
@@ -200,3 +199,4 @@ pub fn initialize() {
 
 // recognized file extensions
 const OBJ_EXT:&str = "obj";
+const GLTF_JSON_EXT:&str = "gltf";

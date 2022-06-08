@@ -1,7 +1,7 @@
 use crate::{ cstr::*, debugging::{log, Error}, Rc };
 use gl::types::*;
 use fmath::types::*;
-use super::{ Sampler, ShaderProgram, Texture };
+use super::{ Sampler, ShaderProgram, Texture, texture };
 use core::fmt;
 
 pub struct UniformInfo {
@@ -22,8 +22,23 @@ impl UniformInfo {
 
     pub fn generate_values( uniforms:&Vec<Self> ) -> Vec<Uniform> {
         let mut buffer = Vec::with_capacity( uniforms.len() );
+        let mut sampler_count = 0;
         for uniform in uniforms.iter() {
-            let uniform_value = Uniform::new( uniform.kind(), uniform.location() );
+            let mut uniform_value = Uniform::new( uniform.kind(), uniform.location() );
+            match uniform.kind() {
+                gl::SAMPLER_2D => {
+                    if sampler_count == 0 {
+                        uniform_value.set_sampler2d_location( Sampler::new( sampler_count ) );
+                    } else {
+                        uniform_value.set_sampler2d(
+                            Texture::new_color_texture( color::RGB::new_black() ),
+                            Sampler::new( sampler_count )
+                        );
+                    }
+                    sampler_count += 1;
+                },
+                _ => {}
+            }
             buffer.push( uniform_value );
         }
         buffer
@@ -119,7 +134,7 @@ impl Uniform {
             gl::FLOAT_MAT3   => Self::Float32Mat3( Matrix3x3::new_zero(), location ),
             gl::FLOAT_MAT4   => Self::Float32Mat4( Matrix4x4::new_zero(), location ),
 
-            gl::SAMPLER_2D => Self::Sampler2D( ( Texture::empty(), Sampler::empty() ), location ),
+            gl::SAMPLER_2D => Self::Sampler2D( ( texture::null_texture(), Sampler::empty() ), location ),
 
             _ => Self::None,
         }
@@ -271,12 +286,36 @@ impl Uniform {
         }
     }
 
-    pub fn set_sampler2d(&mut self, v:( Rc<Texture>, Sampler)) {
+    pub fn set_sampler2d(&mut self, texture:Rc<Texture>, sampler:Sampler) {
         match self {
-            Self::Sampler2D( value, _ ) => { *value = v },
+            Self::Sampler2D( value, _ ) => { *value = ( texture, sampler ) },
+            _ => {
+                log(
+                    &format!("Attempted to assign Texture and Sampler to Uniform of type {}!", self.type_name()),
+                    "Uniform Value | Warning"
+                )
+            }
+        }
+    }
+
+    pub fn set_sampler2d_location(&mut self, sampler:Sampler) {
+        match self {
+            Self::Sampler2D( ( _, value ), _ ) => { *value = sampler },
             _ => {
                 log(
                     &format!("Attempted to assign Sampler to Uniform of type {}!", self.type_name()),
+                    "Uniform Value | Warning"
+                )
+            }
+        }
+    }
+
+    pub fn set_texture2d( &mut self, texture:Rc<Texture> ) {
+        match self {
+            Self::Sampler2D( ( value, _ ), _ ) => { *value = texture },
+            _ => {
+                log(
+                    &format!("Attempted to assign Texture to Uniform of type {}!", self.type_name()),
                     "Uniform Value | Warning"
                 )
             }
@@ -379,4 +418,101 @@ impl fmt::Display for Uniform {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!( f, "Uniform {:3}: {} {}", self.location(), self.type_name(), self.format_data() )
     }
+}
+
+pub struct UniformBlock {
+    ubo:  GLuint,
+    size: usize,
+    buffer_points: Vec<GLuint>,
+}
+
+impl UniformBlock {
+    pub fn new( data:Option< &[u8] >, size:usize ) -> Self {
+        let mut ubo = 0;
+        unsafe {
+
+            let data_ptr = match data {
+                Some(data) => data.as_ptr() as *const GLvoid,
+                None => core::ptr::null() as *const GLvoid,
+            };
+
+            gl::GenBuffers(1, &mut ubo);
+            gl::BindBuffer( gl::UNIFORM_BUFFER, ubo );
+            gl::BufferData( gl::UNIFORM_BUFFER,
+                size as GLsizeiptr,
+                data_ptr,
+                gl::STATIC_DRAW
+            );
+        }
+        Self { ubo, size, buffer_points:Vec::new() }
+    }
+
+    pub fn use_block(&self) {
+        unsafe { gl::BindBuffer( gl::UNIFORM_BUFFER, self.ubo ) }
+    }
+
+    pub fn bind_to_buffer_point( &mut self, buffer_point:GLuint ) {
+        unsafe {
+            gl::BindBufferBase(
+                gl::UNIFORM_BUFFER,
+                buffer_point,
+                self.ubo
+            );
+        }
+        if !self.buffer_points.contains( &buffer_point ) {
+            self.buffer_points.push( buffer_point )
+        } else {
+            log(
+                &format!(
+                    "Attempted to bind Uniform Block \"{}\" to point \"{}\" but it's already bound there!",
+                    self.ubo, buffer_point
+                ),
+                "Uniform Block"
+            )
+        }
+    }
+
+    pub fn unbind_from_buffer_point( &mut self, buffer_point:GLuint ) {
+        if self.buffer_points.contains( &buffer_point ) {
+            self.buffer_points.retain( |x| *x != buffer_point );
+            self.buffer_points.shrink_to_fit();
+        } else {
+            log(
+                &format!(
+                    "Attempted to unbind Uniform Block \"{}\" from point \"{}\" but it was never bound there!",
+                    self.ubo, buffer_point
+                ),
+                "Uniform Block"
+            );
+            return;
+        }
+        unsafe {
+            gl::BindBufferBase(
+                gl::UNIFORM_BUFFER,
+                buffer_point,
+                0
+            );
+        }
+    }
+
+    pub fn set_data( &self, data:&[u8] ) {
+        unsafe {
+            gl::BufferSubData(
+                gl::UNIFORM_BUFFER, 0,
+                self.size as GLsizeiptr,
+                data.as_ptr() as *const GLvoid
+            )
+        }
+    }
+
+    pub fn set_data_slice( &self, data:&[u8], offset:usize ) {
+        unsafe {
+            gl::BufferSubData(
+                gl::UNIFORM_BUFFER, offset as GLintptr,
+                data.len() as GLsizeiptr,
+                data.as_ptr() as *const GLvoid
+            )
+        }
+    }
+
 }

@@ -102,6 +102,12 @@ impl ShaderProgram {
         }
     }
 
+    fn gl_get_uniform_block_index( handle:GLuint, name:&CStr ) -> GLuint {
+        unsafe {
+            gl::GetUniformBlockIndex( handle, name.as_ptr() as *const GLchar )
+        }
+    }
+
     pub fn use_program(&self) { unsafe { gl::UseProgram( self.handle() ); } }
 
     pub fn generate_uniforms(&self) -> ( Vec<Uniform>, Vec<bool> ) {
@@ -126,6 +132,34 @@ impl ShaderProgram {
         }
 
         result
+    }
+
+    pub fn get_uniform_block_index(&self, name:&str) -> GLuint {
+        let cname = CString::new( name ).unwrap();
+        let result = Self::gl_get_uniform_block_index( self.handle(), &cname );
+        #[cfg(debug_assertions)]
+        if result == gl::INVALID_INDEX {
+            log(
+                &format!( "Uniform Block \"{}\" not found!", name ),
+                &format!( "Shader {} get_uniform_block_index()", self.handle() )
+            )
+        }
+
+        result
+    }
+
+    pub fn bind_uniform_block( &self, block_index:GLuint, block_binding:GLuint ) {
+        unsafe {
+            gl::UniformBlockBinding(
+                self.handle(), block_index,
+                block_binding
+            );
+        }
+    }
+
+    pub fn bind_uniform_block_by_name( &self, name:&str, block_binding:GLuint ) {
+        let idx = self.get_uniform_block_index( name );
+        self.bind_uniform_block( idx, block_binding );
     }
 
 }
@@ -308,3 +342,11 @@ enum ParseKind {
 }
 
 const INVALID_LOCATION:GLint = -1;
+
+pub fn null_shader() -> Rc<ShaderProgram> {
+    thread_local!(
+        static NULL_SHADER: Rc<ShaderProgram> =
+            crate::resources::load_shader_program("blinn-phong").unwrap()
+    );
+    NULL_SHADER.with( |s| s.clone() )
+}

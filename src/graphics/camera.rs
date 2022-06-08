@@ -1,9 +1,10 @@
 use fmath::types::*;
 use core::fmt;
 
+use crate::Transform;
+
 pub struct Camera {
-    position: Vector3,
-    rotation: Vector3,
+    pub transform: Transform,
     projection: Projection,
     resolution: ScreenResolution,
     near: f32, far: f32
@@ -11,26 +12,22 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(
-        position: Vector3, rotation: Vector3,
+        transform: Transform,
         projection: Projection, resolution: ScreenResolution,
         near: f32, far: f32
     ) -> Self {
-        Self { position, rotation, projection, resolution, near, far }
+        Self { transform, projection, resolution, near, far }
     }
 
-    pub fn position( &self ) -> &Vector3 { &self.position }
-    pub fn rotation( &self ) -> &Vector3 { &self.rotation }
-
-    pub fn position_mut( &mut self ) -> &mut Vector3 { &mut self.position }
-    pub fn rotation_mut( &mut self ) -> &mut Vector3 { &mut self.rotation }
-
-    pub fn translate( &mut self, delta:&Vector3 ) { self.position = self.position + *delta }
-    pub fn rotate( &mut self, delta:&Vector3 )    { self.rotation = self.rotation + *delta }
-
-    pub fn new_forward( &self ) -> Vector3 { Vector3::new_basis_forward( self.rotation[1], self.rotation[0] ) }
+    pub fn near_clip(&self) -> f32 { self.near }
+    pub fn far_clip(&self)  -> f32 { self.far }
 
     pub fn new_view( &self, forward:Vector3 ) -> Matrix4x4 {
-        Matrix4x4::new_look_at( &self.position, &(self.position + forward), &Vector3::new_up() )
+        Matrix4x4::new_look_at(
+            self.transform.position(),
+            &( *self.transform.position() + forward ),
+            &Vector3::new_up()
+        )
     }
 
     pub fn orthographic_size( &self ) -> Option<f32> {
@@ -77,11 +74,11 @@ pub enum Projection {
 }
 
 impl Projection {
-    pub fn new_ortho( size:f32 ) -> Self {
+    pub fn new_orthographic( size:f32 ) -> Self {
         Self::Orthographic( Orthographic::new( size ) )
     }
 
-    pub fn ortho_default() -> Self {
+    pub fn orthographic_default() -> Self {
         Self::Orthographic( Orthographic::default() )
     }
 
@@ -138,7 +135,7 @@ pub struct Perspective {
 impl Perspective {
 
     pub fn new( fov_rad:f32 ) -> Self { Self { fov_rad } }
-    pub fn default() -> Self { Self::new( 65f32.to_radians() ) }
+    pub fn default() -> Self { Self::new( 1.13446 ) }
 
     pub fn fov( &self ) -> f32 { self.fov_rad }
 

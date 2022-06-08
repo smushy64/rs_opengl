@@ -19,9 +19,24 @@ impl Texture {
         } )
     }
 
+    fn null_color() -> Rc<Self> {
+        let image = ImageGL {
+            width: 8, height: 8,
+            internal_format: gl::RGBA8,
+            format: gl::RGBA,
+            data: Vec::from( NULL_TEXTURE_IMAGE )
+        };
+        let mut options = TextureOptions::default();
+        options.set_mag_filtering( TextureFiltering::Nearest );
+        options.set_wrapping( TextureWrapping::Repeat );
+
+        Self::new( image, options )
+    }
+
     pub fn new_color_texture( color:RGB ) -> Rc<Self> {
         let image = ImageGL {
             width: 1, height: 1,
+            internal_format: gl::RGB8,
             format: gl::RGB,
             data: Vec::from( color.as_array_rgb() )
         };
@@ -67,7 +82,7 @@ impl Texture {
             );
 
             gl::TexImage2D(
-                gl::TEXTURE_2D, 0, image.format as GLint,
+                gl::TEXTURE_2D, 0, image.internal_format as GLint,
                 image.width, image.height,
                 0, image.format, gl::UNSIGNED_BYTE,
                 image.data.as_ptr() as *const GLvoid
@@ -80,9 +95,9 @@ impl Texture {
         Rc::new( Texture { handle, image, options } )
     }
 
-    pub fn handle( &self )        -> &GLuint           { &self.handle                }
-    pub fn width( &self )         -> &GLint            { &self.image.width           }
-    pub fn height( &self )        -> &GLint            { &self.image.height          }
+    pub fn handle( &self )        -> GLuint            { self.handle                }
+    pub fn width( &self )         -> GLint             { self.image.width           }
+    pub fn height( &self )        -> GLint             { self.image.height          }
     pub fn image_data( &self )    -> &Vec<u8>          { &self.image.data            }
     pub fn wrapping_x( &self )    -> &TextureWrapping  { &self.options.wrapping_x    }
     pub fn wrapping_y( &self )    -> &TextureWrapping  { &self.options.wrapping_y    }
@@ -92,7 +107,7 @@ impl Texture {
     pub fn use_texture( &self, sampler:&Sampler, uniform_handle:GLint ) {
         unsafe {
             gl::ActiveTexture( sampler.handle() );
-            gl::BindTexture( gl::TEXTURE_2D, *self.handle() );
+            gl::BindTexture( gl::TEXTURE_2D, self.handle() );
             gl::Uniform1i( uniform_handle, *sampler.id() );
         }
     }
@@ -116,7 +131,7 @@ pub unsafe fn delete_textures( textures: Vec<Rc<Texture>> ) {
             // make sure each texture being deleted is not in use
             panic!( "Attempted to delete a texture that is still in use! Reference Count: {}", ref_count );
         }
-        handles.push( *texture.handle() );
+        handles.push( texture.handle() );
     }
     drop( textures );
     gl::DeleteTextures( handles.len() as GLsizei, handles.as_ptr() );
@@ -243,6 +258,7 @@ impl MipmapFiltering {
 #[derive(Debug)]
 pub struct ImageGL {
     pub width:GLint, pub height:GLint,
+    pub internal_format:GLenum,
     pub format:GLenum,
     pub data:Vec<u8>
 }
@@ -252,7 +268,8 @@ impl ImageGL {
     pub fn empty() -> Self {
         Self {
             width:  0, height: 0,
-            format: 0, data: Vec::new()
+            internal_format: 0, format: 0,
+            data: Vec::new()
         }
     }
 
@@ -270,10 +287,44 @@ impl ImageGL {
             Self {
                 width: dynamic.width() as GLint,
                 height: dynamic.height() as GLint,
-                format, data
+                internal_format: format, format,
+                data
             }
         )
 
     }
 
 }
+
+pub fn null_texture() -> Rc<Texture> {
+    thread_local!(
+        static NULL_TEXTURE: Rc<Texture> = Texture::null_color();
+    );
+    NULL_TEXTURE.with( |s| s.clone() )
+}
+
+const NULL_TEXTURE_IMAGE:[u8;256] = [
+    255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,
+    255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,
+
+    000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,
+    000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,
+
+    255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,
+    255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,
+
+    000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,
+    000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,
+
+    255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,
+    255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,
+
+    000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,
+    000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,
+
+    255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,
+    255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,
+
+    000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,
+    000, 000, 000, 255,   255, 000, 255, 255,   000, 000, 000, 255,   255, 000, 255, 255,
+];
